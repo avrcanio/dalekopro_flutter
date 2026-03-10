@@ -10,26 +10,38 @@ void main() {
         'zivotni_broj': 'HR1',
         'ime': 'Mila',
         'potomci': [
-          {'zivotni_broj': 'HR2'},
+          {'id': 2, 'govedo_id': 2, 'zivotni_broj': 'HR2', 'ime': 'Lina'},
         ],
       },
     });
 
-    expect(cattle.potomci, ['HR2']);
+    expect(cattle.hasPotomciField, isTrue);
+    expect(cattle.potomci.length, 1);
+    expect(cattle.potomci.first.zivotniBroj, 'HR2');
+    expect(cattle.potomci.first.govedoId, 2);
   });
 
-  test('falls back to telad when potomci missing', () {
+  test('hides potomci section when potomci is null', () {
     final cattle = Cattle.fromApi({
       'govedo': {
         'id': 1,
         'zivotni_broj': 'HR1',
         'ime': 'Mila',
-        'telad': [
-          {'zivotni_broj': 'HR3'},
-        ],
+        'potomci': null,
       },
     });
 
-    expect(cattle.potomci, ['HR3']);
+    expect(cattle.hasPotomciField, isFalse);
+    expect(cattle.potomci, isEmpty);
+  });
+
+  test('fallbacks for optional detail fields', () {
+    final cattle = Cattle.fromApi({
+      'govedo': {'id': 1, 'zivotni_broj': 'HR1', 'ime': 'Mila'},
+    });
+
+    expect(cattle.uzrast, '');
+    expect(cattle.majka, '');
+    expect(cattle.otac, '');
   });
 }

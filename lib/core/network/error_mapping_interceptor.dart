@@ -1,10 +1,16 @@
 import 'package:dio/dio.dart';
 
+import '../logging/app_logger.dart';
 import 'app_network_exception.dart';
 
 class ErrorMappingInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    AppLogger.network(
+      'HTTP error ${err.requestOptions.method} ${err.requestOptions.path}',
+      error: err,
+      stackTrace: err.stackTrace,
+    );
     final mapped = _map(err);
     handler.reject(err.copyWith(error: mapped));
   }

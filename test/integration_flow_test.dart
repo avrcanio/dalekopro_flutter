@@ -1,6 +1,5 @@
-﻿import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dalekopro_farma_flutter/core/network/api_client.dart';
@@ -12,31 +11,18 @@ import 'package:dalekopro_farma_flutter/features/cattle/presentation/cattle_list
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
 
+import 'test_helpers.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const secureStorageChannel = MethodChannel(
-    'plugins.it_nomads.com/flutter_secure_storage',
-  );
-
   setUp(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureStorageChannel, (call) async {
-          switch (call.method) {
-            case 'read':
-              return null;
-            case 'write':
-            case 'delete':
-              return null;
-            default:
-              return null;
-          }
-        });
+    setupMockSecureStorage();
+    setupMockGeolocator();
   });
-
   tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureStorageChannel, null);
+    clearMockGeolocator();
+    clearMockSecureStorage();
   });
 
   testWidgets('full flow login -> lista -> detalj -> upload screen', (
@@ -140,19 +126,58 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Prijavi se'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Goveda'), findsOneWidget);
+    expect(find.textContaining('Goveda'), findsOneWidget);
     expect(find.text('Mila'), findsOneWidget);
 
-    await tester.tap(find.text('Mila'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Zivotni broj: HR123'), findsOneWidget);
-
-    await tester.tap(find.text('Dodaj i uploadaj sliku'));
+    await tester.tap(find.text('Upload'));
     await tester.pumpAndSettle();
 
     expect(find.text('Upload slike goveda'), findsOneWidget);
     expect(find.textContaining('HR123'), findsOneWidget);
+  });
+
+  testWidgets('negative flow login invalid credentials shows 401 message', (
+    tester,
+  ) async {
+    final tokenStorage = const TokenStorage();
+    final client = ApiClient(tokenStorage: tokenStorage);
+
+    client.dio.interceptors.insert(
+      0,
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          handler.reject(
+            DioException(
+              requestOptions: options,
+              response: Response(requestOptions: options, statusCode: 401),
+              type: DioExceptionType.badResponse,
+            ),
+          );
+        },
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LoginScreen(
+          repository: AuthRepository(
+            client: client,
+            tokenStorage: tokenStorage,
+          ),
+          onLogin: (_) {},
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextFormField).first, 'demo_user');
+    await tester.enterText(find.byType(TextFormField).last, 'bad_pass');
+    await tester.tap(find.widgetWithText(FilledButton, 'Prijavi se'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Neispravno korisnicko ime ili lozinka'),
+      findsOneWidget,
+    );
   });
 }
 

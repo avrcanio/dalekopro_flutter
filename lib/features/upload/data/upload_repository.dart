@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
+import '../../../core/logging/app_logger.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/app_network_exception.dart';
 
@@ -48,8 +49,15 @@ class UploadRepository {
         data: form,
         options: Options(extra: {'retryable': false}),
       );
-      return UploadResult.fromJson(response.data ?? <String, dynamic>{});
-    } on DioException catch (e) {
+
+      final payload = response.data ?? <String, dynamic>{};
+      final result = UploadResult.fromJson(payload);
+      if (result.status == 'UNKNOWN') {
+        throw Exception('Neocekivan odgovor servera tijekom uploada.');
+      }
+      return result;
+    } on DioException catch (e, stack) {
+      AppLogger.network('Upload failed', error: e, stackTrace: stack);
       final mapped = e.error;
       if (mapped is AppNetworkException) {
         if (mapped.statusCode == 404) {
@@ -57,10 +65,25 @@ class UploadRepository {
             'Govedo s odabranim zivotnim brojem nije pronadjeno.',
           );
         }
-        if (mapped.statusCode == 400 && mapped.data != null) {
-          throw Exception('Neispravan unos: ${mapped.data}');
+        if (mapped.statusCode == 400) {
+          final details = mapped.data?.toString();
+          if (details != null && details.isNotEmpty) {
+            throw Exception('Neispravan unos: $details');
+          }
+          throw Exception('Neispravan unos podataka za upload.');
         }
         throw Exception(mapped.message);
+      }
+
+      final status = e.response?.statusCode;
+      if (status == 404) {
+        throw Exception('Govedo s odabranim zivotnim brojem nije pronadjeno.');
+      }
+      if (status == 400) {
+        throw Exception('Neispravan unos podataka za upload.');
+      }
+      if (status == 401) {
+        throw Exception('Sesija nije valjana. Prijavi se ponovno.');
       }
 
       throw Exception('Upload nije uspio. Provjeri mrezu i pokusaj ponovno.');

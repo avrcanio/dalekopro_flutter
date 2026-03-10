@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/status_widgets.dart';
 import '../data/auth_repository.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -33,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_submitting) return;
 
     setState(() {
       _submitting = true;
@@ -96,9 +98,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red),
+                      child: InlineStatusMessage(
+                        message: _error!,
+                        type: StatusType.error,
                       ),
                     ),
                   SizedBox(

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/logging/app_logger.dart';
 import '../../../core/models/app_user.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/app_network_exception.dart';
@@ -38,15 +39,16 @@ class AuthRepository {
         throw Exception('Server nije vratio token.');
       }
 
-      await _tokenStorage.saveToken(token);
-
-      return LoginResult(
-        token: token,
-        user: AppUser.fromJson(
-          (data['user'] as Map?)?.cast<String, dynamic>() ?? {},
-        ),
+      final user = AppUser.fromJson(
+        (data['user'] as Map?)?.cast<String, dynamic>() ?? {},
       );
-    } on DioException catch (e) {
+
+      await _tokenStorage.saveToken(token);
+      await _tokenStorage.saveUser(user);
+
+      return LoginResult(token: token, user: user);
+    } on DioException catch (e, stack) {
+      AppLogger.network('Auth login failed', error: e, stackTrace: stack);
       final mapped = e.error;
       if (mapped is AppNetworkException) {
         if (mapped.statusCode == 401) {
@@ -56,6 +58,14 @@ class AuthRepository {
           throw Exception('Neispravan zahtjev. Provjeri unesene podatke.');
         }
         throw Exception(mapped.message);
+      }
+
+      final status = e.response?.statusCode;
+      if (status == 401) {
+        throw Exception('Neispravno korisnicko ime ili lozinka.');
+      }
+      if (status == 400) {
+        throw Exception('Neispravan zahtjev. Provjeri unesene podatke.');
       }
 
       throw Exception('Mrezna greska tijekom prijave.');
