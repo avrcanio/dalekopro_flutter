@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/widgets/status_widgets.dart';
@@ -8,7 +9,7 @@ import '../../upload/presentation/upload_screen.dart';
 import '../data/cattle_repository.dart';
 import '../models/cattle.dart';
 
-class CattleDetailScreen extends StatelessWidget {
+class CattleDetailScreen extends StatefulWidget {
   const CattleDetailScreen({
     super.key,
     required this.cattle,
@@ -20,14 +21,81 @@ class CattleDetailScreen extends StatelessWidget {
   final List<Cattle> allCattle;
   final UploadRepository uploadRepository;
 
+  @override
+  State<CattleDetailScreen> createState() => _CattleDetailScreenState();
+}
+
+class _CattleDetailScreenState extends State<CattleDetailScreen> {
+  late final PageController _pageController;
+  late List<String> _galleryUrls;
+  Timer? _autoPlayTimer;
+  int _currentImageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _galleryUrls = _buildGalleryUrls();
+    _pageController = PageController();
+    _startAutoPlay();
+  }
+
+  @override
+  void dispose() {
+    _autoPlayTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  List<String> _buildGalleryUrls() {
+    final seen = <String>{};
+    final ordered = <String>[];
+
+    void addUrl(String value) {
+      final normalized = value.trim();
+      if (normalized.isEmpty || seen.contains(normalized)) {
+        return;
+      }
+      seen.add(normalized);
+      ordered.add(normalized);
+    }
+
+    addUrl(widget.cattle.imageUrl);
+    for (final url in widget.cattle.imageUrls) {
+      addUrl(url);
+    }
+
+    return ordered;
+  }
+
+  void _startAutoPlay() {
+    _autoPlayTimer?.cancel();
+    if (_galleryUrls.length <= 1) {
+      return;
+    }
+
+    _autoPlayTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || _galleryUrls.isEmpty) return;
+      final nextIndex = (_currentImageIndex + 1) % _galleryUrls.length;
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          nextIndex,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
   String _displayOrFallback(String value) {
     final trimmed = value.trim();
     return trimmed.isEmpty ? 'Nije dostupno' : trimmed;
   }
 
   Cattle _resolveDescendantProfile(CattleDescendant descendant) {
+    final allCattle = widget.allCattle;
     for (final item in allCattle) {
-      final matchesById = descendant.govedoId > 0 && item.id == descendant.govedoId;
+      final matchesById =
+          descendant.govedoId > 0 && item.id == descendant.govedoId;
       final matchesByNumber =
           descendant.zivotniBroj.trim().isNotEmpty &&
           item.zivotniBroj.trim().toUpperCase() ==
@@ -57,108 +125,153 @@ class CattleDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cattle = widget.cattle;
+    final allCattle = widget.allCattle;
+    final uploadRepository = widget.uploadRepository;
+
     return Scaffold(
       appBar: AppBar(title: Text(cattle.displayName)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (cattle.imageUrl.trim().isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: 3 / 4,
-                child: Image.network(
-                  cattle.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const _ImageFallback(),
-                ),
-              ),
-            )
-          else
-            const _ImageFallback(),
+          _buildImageSection(context),
           const SizedBox(height: 16),
+          Text('Posjed: ${_displayOrFallback(cattle.posjed)}'),
           Text('Zivotni broj: ${cattle.zivotniBroj}'),
           Text('Ime: ${_displayOrFallback(cattle.ime)}'),
           Text('Spol: ${_displayOrFallback(cattle.spol)}'),
           Text('Datum telenja: ${_displayOrFallback(cattle.datumTelenja)}'),
-          Text('Posjed: ${_displayOrFallback(cattle.posjed)}'),
           Text('Uzrast: ${_displayOrFallback(cattle.uzrast)}'),
           Text('Majka: ${_displayOrFallback(cattle.majka)}'),
           Text('Otac: ${_displayOrFallback(cattle.otac)}'),
-          if (cattle.imageUrls.isNotEmpty) ...[
-            const SizedBox(height: 16),
+          if (cattle.potomci.isNotEmpty) ...[
+            const SizedBox(height: 12),
             const Text(
-              'Galerija slika',
+              'Potomci:',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 120,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: cattle.imageUrls.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final url = cattle.imageUrls[index];
-                  return ClipRRect(
+            ...cattle.potomci.map((descendant) {
+              return Card(
+                margin: const EdgeInsets.only(top: 8),
+                child: ListTile(
+                  title: Text(
+                    'Zivotni broj: ${_displayOrFallback(descendant.zivotniBroj)}',
+                  ),
+                  subtitle: Text(
+                    'Ime: ${_displayOrFallback(descendant.ime)}\n'
+                    'Datum telenja: ${_displayOrFallback(descendant.datumTelenja)}\n'
+                    'Spol: ${_displayOrFallback(descendant.spol)}',
+                  ),
+                  isThreeLine: true,
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: () {
+                    final profile = _resolveDescendantProfile(descendant);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CattleDetailScreen(
+                          cattle: profile,
+                          allCattle: allCattle,
+                          uploadRepository: uploadRepository,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageSection(BuildContext context) {
+    if (_galleryUrls.isEmpty) {
+      return const _ImageFallback();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: AspectRatio(
+            aspectRatio: 3 / 4,
+            child: PageView.builder(
+              key: const Key('cattle-detail-pageview'),
+              controller: _pageController,
+              itemCount: _galleryUrls.length,
+              onPageChanged: (value) {
+                setState(() {
+                  _currentImageIndex = value;
+                });
+              },
+              itemBuilder: (context, index) {
+                final url = _galleryUrls[index];
+                return Image.network(
+                  url,
+                  key: Key('cattle-detail-main-image-$index'),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const _ImageFallback(),
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 80,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _galleryUrls.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final url = _galleryUrls[index];
+              final isSelected = index == _currentImageIndex;
+              return GestureDetector(
+                onTap: () {
+                  _pageController.animateToPage(
+                    index,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                child: AnimatedContainer(
+                  key: Key('cattle-detail-thumb-$index'),
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.outlineVariant,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
                     child: Image.network(
                       url,
-                      width: 90,
-                      height: 120,
+                      width: 70,
+                      height: 76,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        width: 90,
-                        height: 120,
+                        width: 70,
+                        height: 76,
                         color: Theme.of(
                           context,
                         ).colorScheme.surfaceContainerHighest,
                         child: const Icon(Icons.broken_image_outlined),
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-          ],
-          if (cattle.hasPotomciField) ...[
-            const SizedBox(height: 12),
-            const Text('Potomci:', style: TextStyle(fontWeight: FontWeight.bold)),
-            if (cattle.potomci.isEmpty)
-              const Text('Nema dostupnih potomaka')
-            else
-              ...cattle.potomci.map((descendant) {
-                return Card(
-                  margin: const EdgeInsets.only(top: 8),
-                  child: ListTile(
-                    title: Text(
-                      'Zivotni broj: ${_displayOrFallback(descendant.zivotniBroj)}',
-                    ),
-                    subtitle: Text(
-                      'Ime: ${_displayOrFallback(descendant.ime)}\n'
-                      'Datum telenja: ${_displayOrFallback(descendant.datumTelenja)}\n'
-                      'Spol: ${_displayOrFallback(descendant.spol)}',
-                    ),
-                    isThreeLine: true,
-                    trailing: const Icon(Icons.open_in_new),
-                    onTap: () {
-                      final profile = _resolveDescendantProfile(descendant);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => CattleDetailScreen(
-                            cattle: profile,
-                            allCattle: allCattle,
-                            uploadRepository: uploadRepository,
-                          ),
-                        ),
-                      );
-                    },
                   ),
-                );
-              }),
-          ],
-        ],
-      ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
