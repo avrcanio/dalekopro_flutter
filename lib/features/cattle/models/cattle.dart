@@ -83,6 +83,45 @@ class Cattle {
     return value.toString();
   }
 
+  static String _extractPosjed(
+    Map<String, dynamic> govedo,
+    Map<String, dynamic> apiEntry,
+  ) {
+    final candidates = <dynamic>[
+      govedo['posjed'],
+      govedo['naziv_posjeda'],
+      govedo['posjed_naziv'],
+      apiEntry['posjed'],
+      apiEntry['naziv_posjeda'],
+      apiEntry['posjed_naziv'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate == null) continue;
+      if (candidate is Map) {
+        final map = candidate.cast<String, dynamic>();
+        final extracted =
+            map['naziv']?.toString() ??
+            map['name']?.toString() ??
+            map['label']?.toString() ??
+            map['posjed']?.toString() ??
+            map['naziv_posjeda']?.toString() ??
+            '';
+        if (extracted.trim().isNotEmpty) {
+          return extracted.trim();
+        }
+        continue;
+      }
+
+      final extracted = _extractText(candidate).trim();
+      if (extracted.isNotEmpty) {
+        return extracted;
+      }
+    }
+
+    return '';
+  }
+
   static String _normalizeUzrastValue(String raw) {
     final value = raw.trim();
     if (value.isEmpty) return '';
@@ -316,7 +355,7 @@ class Cattle {
       ime: govedo['ime']?.toString() ?? '',
       spol: govedo['spol']?.toString() ?? '',
       datumTelenja: govedo['datum_telenja']?.toString() ?? '',
-      posjed: _extractText(govedo['posjed']),
+      posjed: _extractPosjed(govedo, apiEntry),
       uzrast: _extractUzrastFromBackend(govedo, apiEntry),
       majka: _extractText(govedo['majka']),
       otac: _extractText(govedo['otac']),

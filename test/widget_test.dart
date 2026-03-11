@@ -44,4 +44,17 @@ void main() {
     expect(cattle.majka, '');
     expect(cattle.otac, '');
   });
+
+  test('maps posjed from root entry when missing in govedo', () {
+    final cattle = Cattle.fromApi({
+      'posjed': {'naziv': 'Kuca'},
+      'govedo': {
+        'id': 1,
+        'zivotni_broj': 'HR1',
+        'ime': 'Mila',
+      },
+    });
+
+    expect(cattle.posjed, 'Kuca');
+  });
 }
