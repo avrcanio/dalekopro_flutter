@@ -8,6 +8,7 @@ import 'package:dalekopro_farma_flutter/features/auth/data/auth_repository.dart'
 import 'package:dalekopro_farma_flutter/features/auth/presentation/login_screen.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/data/cattle_repository.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/presentation/cattle_list_screen.dart';
+import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
 
@@ -126,6 +127,10 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Prijavi se'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Pocetni dashboard'), findsOneWidget);
+    await tester.tap(find.text('Goveda'));
+    await tester.pumpAndSettle();
+
     expect(find.textContaining('Goveda'), findsOneWidget);
     expect(find.text('Mila'), findsOneWidget);
 
@@ -209,7 +214,7 @@ class _FlowTestAppState extends State<_FlowTestApp> {
               repository: widget.authRepository,
               onLogin: (token) => setState(() => _token = token),
             )
-          : CattleListScreen(
+          : DashboardScreen(
               farmsRepository: widget.farmsRepository,
               cattleRepository: widget.cattleRepository,
               uploadRepository: widget.uploadRepository,

@@ -5,7 +5,7 @@ import 'core/storage/token_storage.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cattle/data/cattle_repository.dart';
-import 'features/cattle/presentation/cattle_list_screen.dart';
+import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/farms/data/farms_repository.dart';
 import 'features/upload/data/upload_repository.dart';
 
@@ -70,7 +70,7 @@ class _DalekoproAppState extends State<DalekoproApp> {
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : (_token == null
                 ? LoginScreen(repository: authRepository, onLogin: _onLogin)
-                : CattleListScreen(
+                : DashboardScreen(
                     farmsRepository: farmsRepository,
                     cattleRepository: cattleRepository,
                     uploadRepository: uploadRepository,

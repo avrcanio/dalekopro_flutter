@@ -9,6 +9,7 @@ import 'package:dalekopro_farma_flutter/features/auth/presentation/login_screen.
 import 'package:dalekopro_farma_flutter/features/cattle/data/cattle_repository.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/models/cattle.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/presentation/cattle_list_screen.dart';
+import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/presentation/upload_screen.dart';
@@ -123,7 +124,6 @@ void main() {
           farmsRepository: FarmsRepository(client: client),
           cattleRepository: CattleRepository(client: client),
           uploadRepository: UploadRepository(client: client),
-          onLogout: () async {},
         ),
       ),
     );
@@ -172,6 +172,90 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'dashboard renders dropdown and navigates to cattle list',
+    (tester) async {
+      final storage = const TokenStorage();
+      final client = ApiClient(tokenStorage: storage);
+
+      client.dio.interceptors.insert(
+        0,
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/api/gospodarstva/') {
+              handler.resolve(
+                Response<List<Map<String, dynamic>>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: [
+                    {
+                      'id': 1,
+                      'naziv_gospodarstva': 'OPG A',
+                      'naziv_farme': 'Farma A',
+                    },
+                  ],
+                ),
+              );
+              return;
+            }
+
+            if (options.path == '/api/gospodarstva/1/animals/') {
+              handler.resolve(
+                Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'animals': [
+                      {
+                        'govedo': {
+                          'id': 1,
+                          'zivotni_broj': 'HR00001234',
+                          'ime': 'Mila',
+                          'spol': 'Z',
+                          'datum_telenja': '2020-05-01',
+                          'potomci': [],
+                        },
+                      },
+                    ],
+                  },
+                ),
+              );
+              return;
+            }
+
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                type: DioExceptionType.unknown,
+              ),
+            );
+          },
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DashboardScreen(
+            farmsRepository: FarmsRepository(client: client),
+            cattleRepository: CattleRepository(client: client),
+            uploadRepository: UploadRepository(client: client),
+            onLogout: () async {},
+          ),
+        ),
+      );
+
+      expect(find.text('Pocetni dashboard'), findsOneWidget);
+      expect(find.widgetWithText(DropdownButtonFormField<String>, 'Odaberi opciju'), findsOneWidget);
+      expect(find.text('Goveda'), findsOneWidget);
+
+      await tester.tap(find.text('Goveda'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Goveda'), findsOneWidget);
+      expect(find.text('Mila'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'cattle search filters by last 4 digits for short query and full string for long query',
@@ -250,7 +334,6 @@ void main() {
             farmsRepository: FarmsRepository(client: client),
             cattleRepository: CattleRepository(client: client),
             uploadRepository: UploadRepository(client: client),
-            onLogout: () async {},
           ),
         ),
       );

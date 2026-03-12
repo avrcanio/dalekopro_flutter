@@ -282,13 +282,11 @@ class CattleListScreen extends StatefulWidget {
     required this.farmsRepository,
     required this.cattleRepository,
     required this.uploadRepository,
-    required this.onLogout,
   });
 
   final FarmsRepository farmsRepository;
   final CattleRepository cattleRepository;
   final UploadRepository uploadRepository;
-  final Future<void> Function() onLogout;
 
   @override
   State<CattleListScreen> createState() => _CattleListScreenState();
@@ -644,15 +642,7 @@ class _CattleListScreenState extends State<CattleListScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Goveda ($totalCattleCount)'),
-        actions: [
-          IconButton(
-            onPressed: widget.onLogout,
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text('Goveda ($totalCattleCount)')),
       body: contentHasInternalRefresh
           ? content
           : RefreshIndicator(onRefresh: _loadData, child: content),

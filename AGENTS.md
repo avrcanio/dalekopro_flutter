@@ -109,3 +109,7 @@ gh issue view 1 --repo avrcanio/dalekopro --json number,title,body,state,labels,
 - Folder behavior explicitly defined: Android SAF user-selected folder with persisted URI.
 - Security rule included: GH token must never be exposed.
 - End-to-end instructions are decision-complete for camera/folder/crop/cattle-link/upload flow.
+
+## Kluster Policy
+- `kluster_code_review_auto` is disabled for this repository.
+- Do not use `kluster_code_review_auto` in this project workflow.
