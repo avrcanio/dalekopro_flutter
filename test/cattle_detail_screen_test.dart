@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
 
 import 'package:dalekopro_farma_flutter/core/network/api_client.dart';
 import 'package:dalekopro_farma_flutter/core/storage/token_storage.dart';
+import 'package:dalekopro_farma_flutter/features/cattle/data/cattle_repository.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/models/cattle.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/presentation/cattle_list_screen.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
@@ -25,6 +27,11 @@ void main() {
   UploadRepository buildUploadRepository() {
     final client = ApiClient(tokenStorage: const TokenStorage());
     return UploadRepository(client: client);
+  }
+
+  CattleRepository buildCattleRepository() {
+    final client = ApiClient(tokenStorage: const TokenStorage());
+    return CattleRepository(client: client);
   }
 
   Cattle buildCattle({
@@ -71,6 +78,7 @@ void main() {
         home: CattleDetailScreen(
           cattle: cattle,
           allCattle: const [],
+          cattleRepository: buildCattleRepository(),
           uploadRepository: buildUploadRepository(),
         ),
       ),
@@ -92,6 +100,7 @@ void main() {
         home: CattleDetailScreen(
           cattle: cattle,
           allCattle: const [],
+          cattleRepository: buildCattleRepository(),
           uploadRepository: buildUploadRepository(),
         ),
       ),
@@ -133,6 +142,7 @@ void main() {
         home: CattleDetailScreen(
           cattle: cattle,
           allCattle: const [],
+          cattleRepository: buildCattleRepository(),
           uploadRepository: buildUploadRepository(),
         ),
       ),
@@ -168,5 +178,222 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     await tester.pump(const Duration(milliseconds: 400));
     expect(thumbBorderWidth(tester, 0), 2);
+  });
+
+  testWidgets('renders majka and otac in structured format', (tester) async {
+    final cattle = buildCattle(
+      imageUrl: 'https://example.com/main.jpg',
+      imageUrls: const ['https://example.com/1.jpg'],
+    );
+    final cattleWithParents = Cattle(
+      id: cattle.id,
+      zivotniBroj: cattle.zivotniBroj,
+      ime: cattle.ime,
+      spol: cattle.spol,
+      datumTelenja: cattle.datumTelenja,
+      posjed: cattle.posjed,
+      uzrast: cattle.uzrast,
+      majka: cattle.majka,
+      otac: cattle.otac,
+      majkaRef: const CattleParentRef(
+        id: 114,
+        broj: 'HR 1201164650',
+        ime: 'BELA B126',
+      ),
+      otacRef: const CattleParentRef(
+        id: 1,
+        broj: '87000000158',
+        ime: 'JABLAN LB4',
+      ),
+      imageUrl: cattle.imageUrl,
+      imageUrls: cattle.imageUrls,
+      potomci: cattle.potomci,
+      hasPotomciField: cattle.hasPotomciField,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CattleDetailScreen(
+          cattle: cattleWithParents,
+          allCattle: const [],
+          cattleRepository: buildCattleRepository(),
+          uploadRepository: buildUploadRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final majkaFinder = find.textContaining(
+      'Majka: HR 1201164650 (BELA B126)',
+      skipOffstage: false,
+    );
+    await tester.scrollUntilVisible(
+      majkaFinder,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(majkaFinder, findsOneWidget);
+    expect(
+      find.textContaining('Otac: 87000000158 (JABLAN LB4)', skipOffstage: false),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('tap on local majka opens parent detail', (tester) async {
+    final child = buildCattle(
+      imageUrl: 'https://example.com/main.jpg',
+      imageUrls: const ['https://example.com/1.jpg'],
+    );
+    final childWithRef = Cattle(
+      id: child.id,
+      zivotniBroj: child.zivotniBroj,
+      ime: child.ime,
+      spol: child.spol,
+      datumTelenja: child.datumTelenja,
+      posjed: child.posjed,
+      uzrast: child.uzrast,
+      majka: child.majka,
+      otac: child.otac,
+      majkaRef: const CattleParentRef(
+        id: 2,
+        broj: 'HR9200967481',
+        ime: 'MAMA',
+      ),
+      imageUrl: child.imageUrl,
+      imageUrls: child.imageUrls,
+      potomci: child.potomci,
+      hasPotomciField: child.hasPotomciField,
+    );
+    final parent = Cattle(
+      id: 2,
+      zivotniBroj: 'HR9200967481',
+      ime: 'MAMA',
+      spol: 'Z',
+      datumTelenja: '01.01.2020',
+      posjed: 'Cista',
+      uzrast: 'Krava',
+      majka: '',
+      otac: '',
+      imageUrl: '',
+      potomci: const [],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CattleDetailScreen(
+          cattle: childWithRef,
+          allCattle: [childWithRef, parent],
+          cattleRepository: buildCattleRepository(),
+          uploadRepository: buildUploadRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('cattle-detail-parent-majka')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('cattle-detail-parent-majka')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('MAMA'), findsWidgets);
+    expect(find.text('Govedo nije na aktivnom gospodarstvu.'), findsNothing);
+  });
+
+  testWidgets('fallback API parent fetch shows outside farm notice', (
+    tester,
+  ) async {
+    final storage = const TokenStorage();
+    final client = ApiClient(tokenStorage: storage);
+    client.dio.interceptors.insert(
+      0,
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (options.path == '/api/goveda/goveda/114/') {
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'id': 114,
+                  'zivotni_broj': 'HR 1201164650',
+                  'ime': 'BELA B126',
+                  'spol': 'Z',
+                  'datum_telenja': '05.02.2019',
+                  'uzrast': {'naziv': 'Krava'},
+                },
+              ),
+            );
+            return;
+          }
+
+          handler.reject(
+            DioException(
+              requestOptions: options,
+              type: DioExceptionType.unknown,
+            ),
+          );
+        },
+      ),
+    );
+
+    final child = buildCattle(
+      imageUrl: 'https://example.com/main.jpg',
+      imageUrls: const ['https://example.com/1.jpg'],
+    );
+    final childWithRef = Cattle(
+      id: child.id,
+      zivotniBroj: child.zivotniBroj,
+      ime: child.ime,
+      spol: child.spol,
+      datumTelenja: child.datumTelenja,
+      posjed: child.posjed,
+      uzrast: child.uzrast,
+      majka: child.majka,
+      otac: child.otac,
+      majkaRef: const CattleParentRef(
+        id: 114,
+        broj: 'HR 1201164650',
+        ime: 'BELA B126',
+      ),
+      imageUrl: child.imageUrl,
+      imageUrls: child.imageUrls,
+      potomci: child.potomci,
+      hasPotomciField: child.hasPotomciField,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CattleDetailScreen(
+          cattle: childWithRef,
+          allCattle: [childWithRef],
+          cattleRepository: CattleRepository(client: client),
+          uploadRepository: buildUploadRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('cattle-detail-parent-majka')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('cattle-detail-parent-majka')));
+    await tester.pumpAndSettle();
+
+    final noticeFinder = find.text(
+      'Govedo nije na aktivnom gospodarstvu.',
+      skipOffstage: false,
+    );
+    await tester.scrollUntilVisible(
+      noticeFinder,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(noticeFinder, findsOneWidget);
+    expect(find.text('BELA B126', skipOffstage: false), findsWidgets);
   });
 }

@@ -174,7 +174,7 @@ void main() {
   });
 
   testWidgets(
-    'dashboard renders dropdown and navigates to cattle list',
+    'dashboard renders dropdown and navigates to cattle list and upload',
     (tester) async {
       final storage = const TokenStorage();
       final client = ApiClient(tokenStorage: storage);
@@ -248,12 +248,24 @@ void main() {
       expect(find.text('Pocetni dashboard'), findsOneWidget);
       expect(find.widgetWithText(DropdownButtonFormField<String>, 'Odaberi opciju'), findsOneWidget);
       expect(find.text('Goveda'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Upload'), findsOneWidget);
 
       await tester.tap(find.text('Goveda'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Goveda'), findsOneWidget);
       expect(find.text('Mila'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Upload').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Upload slike goveda'), findsOneWidget);
+      expect(find.textContaining('HR00001234'), findsOneWidget);
     },
   );
 

@@ -41,4 +41,18 @@ class CattleRepository {
     AppLogger.network('Fetched cattle count=${cattle.length} for farm=$farmId');
     return cattle;
   }
+
+  Future<Cattle> fetchCattleById(int cattleId) async {
+    final response = await _client.dio.get('/api/goveda/goveda/$cattleId/');
+    final data = response.data;
+
+    if (data is Map<String, dynamic>) {
+      return Cattle.fromApi(data);
+    }
+
+    AppLogger.network(
+      'Unexpected cattle detail response type for id=$cattleId: ${data.runtimeType}',
+    );
+    throw StateError('Unexpected cattle detail payload for id=$cattleId');
+  }
 }

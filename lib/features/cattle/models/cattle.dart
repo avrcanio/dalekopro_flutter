@@ -34,17 +34,36 @@ class CattleDescendant {
   }
 }
 
+class CattleParentRef {
+  const CattleParentRef({
+    required this.id,
+    required this.broj,
+    required this.ime,
+  });
+
+  final int id;
+  final String broj;
+  final String ime;
+
+  bool get hasValue =>
+      id > 0 || broj.trim().isNotEmpty || ime.trim().isNotEmpty;
+}
+
 class Cattle {
   const Cattle({
     required this.id,
     required this.zivotniBroj,
+    this.redniBroj = '',
     required this.ime,
     required this.spol,
+    this.pasmina = '',
     required this.datumTelenja,
     this.posjed = '',
     required this.uzrast,
     required this.majka,
     required this.otac,
+    this.majkaRef,
+    this.otacRef,
     required this.imageUrl,
     this.thumbnailUrl = '',
     this.imageUrls = const [],
@@ -54,13 +73,17 @@ class Cattle {
 
   final int id;
   final String zivotniBroj;
+  final String redniBroj;
   final String ime;
   final String spol;
+  final String pasmina;
   final String datumTelenja;
   final String posjed;
   final String uzrast;
   final String majka;
   final String otac;
+  final CattleParentRef? majkaRef;
+  final CattleParentRef? otacRef;
   final String imageUrl;
   final String thumbnailUrl;
   final List<String> imageUrls;
@@ -81,6 +104,39 @@ class Cattle {
           '';
     }
     return value.toString();
+  }
+
+  static CattleParentRef? _extractParentRef(
+    dynamic value, {
+    required bool preferHbBroj,
+  }) {
+    if (value is! Map) return null;
+    final map = value.cast<String, dynamic>();
+    final id = (map['id'] as num?)?.toInt() ?? 0;
+    final ime = map['ime']?.toString() ?? '';
+    final brojCandidates = preferHbBroj
+        ? <dynamic>[
+            map['hb_broj'],
+            map['zivotni_broj'],
+            map['broj'],
+          ]
+        : <dynamic>[
+            map['zivotni_broj'],
+            map['hb_broj'],
+            map['broj'],
+          ];
+
+    var broj = '';
+    for (final candidate in brojCandidates) {
+      final extracted = candidate?.toString().trim() ?? '';
+      if (extracted.isNotEmpty) {
+        broj = extracted;
+        break;
+      }
+    }
+
+    final ref = CattleParentRef(id: id, broj: broj, ime: ime);
+    return ref.hasValue ? ref : null;
   }
 
   static String _extractPosjed(
@@ -352,13 +408,20 @@ class Cattle {
     return Cattle(
       id: (govedo['id'] as num?)?.toInt() ?? 0,
       zivotniBroj: govedo['zivotni_broj']?.toString() ?? '',
+      redniBroj:
+          apiEntry['redni_broj']?.toString() ??
+          govedo['redni_broj']?.toString() ??
+          '',
       ime: govedo['ime']?.toString() ?? '',
       spol: govedo['spol']?.toString() ?? '',
+      pasmina: _extractText(govedo['pasmina']),
       datumTelenja: govedo['datum_telenja']?.toString() ?? '',
       posjed: _extractPosjed(govedo, apiEntry),
       uzrast: _extractUzrastFromBackend(govedo, apiEntry),
       majka: _extractText(govedo['majka']),
       otac: _extractText(govedo['otac']),
+      majkaRef: _extractParentRef(govedo['majka'], preferHbBroj: false),
+      otacRef: _extractParentRef(govedo['otac'], preferHbBroj: true),
       imageUrl: primaryImageUrl,
       thumbnailUrl: thumbnailUrl,
       imageUrls: imageUrls,

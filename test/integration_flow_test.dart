@@ -7,7 +7,6 @@ import 'package:dalekopro_farma_flutter/core/storage/token_storage.dart';
 import 'package:dalekopro_farma_flutter/features/auth/data/auth_repository.dart';
 import 'package:dalekopro_farma_flutter/features/auth/presentation/login_screen.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/data/cattle_repository.dart';
-import 'package:dalekopro_farma_flutter/features/cattle/presentation/cattle_list_screen.dart';
 import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
@@ -26,7 +25,7 @@ void main() {
     clearMockSecureStorage();
   });
 
-  testWidgets('full flow login -> lista -> detalj -> upload screen', (
+  testWidgets('full flow login -> dashboard -> upload screen', (
     tester,
   ) async {
     final tokenStorage = const TokenStorage();
@@ -128,13 +127,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Pocetni dashboard'), findsOneWidget);
-    await tester.tap(find.text('Goveda'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Goveda'), findsOneWidget);
-    expect(find.text('Mila'), findsOneWidget);
-
-    await tester.tap(find.text('Upload'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Upload'));
     await tester.pumpAndSettle();
 
     expect(find.text('Upload slike goveda'), findsOneWidget);

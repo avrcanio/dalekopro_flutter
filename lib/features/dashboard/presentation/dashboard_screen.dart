@@ -4,6 +4,7 @@ import '../../cattle/data/cattle_repository.dart';
 import '../../cattle/presentation/cattle_list_screen.dart';
 import '../../farms/data/farms_repository.dart';
 import '../../upload/data/upload_repository.dart';
+import '../../upload/presentation/upload_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -24,13 +25,46 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  static const String _uploadOption = 'Upload';
   static const List<String> _options = <String>[
     'Odaberi opciju',
+    _uploadOption,
     'Opcija A',
     'Opcija B',
   ];
 
   String _selectedOption = _options.first;
+
+  Future<void> _openUploadScreen() async {
+    try {
+      final farms = await widget.farmsRepository.fetchFarms();
+      if (!mounted) return;
+      if (farms.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nema dostupnih gospodarstava za upload.')),
+        );
+        return;
+      }
+
+      final cattle = await widget.cattleRepository.fetchCattleByFarm(
+        farms.first.id,
+      );
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => UploadScreen(
+            cattle: cattle,
+            repository: widget.uploadRepository,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Neuspjelo ucitavanje podataka za upload.')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +99,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               setState(() {
                 _selectedOption = value;
               });
+              if (value == _uploadOption) {
+                _openUploadScreen();
+              }
             },
           ),
           const SizedBox(height: 20),
@@ -82,6 +119,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
             icon: const Icon(Icons.pets),
             label: const Text('Goveda'),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _openUploadScreen,
+            icon: const Icon(Icons.add_a_photo),
+            label: const Text(_uploadOption),
           ),
           const SizedBox(height: 12),
           const Text(
