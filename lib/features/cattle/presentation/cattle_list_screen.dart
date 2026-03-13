@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_cached_network_image.dart';
 import '../../../core/widgets/status_widgets.dart';
 import '../../farms/data/farms_repository.dart';
 import '../../farms/models/farm.dart';
@@ -63,9 +64,14 @@ class _CattleDetailScreenState extends State<CattleDetailScreen> {
       ordered.add(normalized);
     }
 
-    addUrl(widget.cattle.imageUrl);
-    for (final url in widget.cattle.imageUrls) {
-      addUrl(url);
+    // Prefer explicit gallery when backend provides it.
+    // Profile image is only a fallback when gallery is empty.
+    if (widget.cattle.imageUrls.isNotEmpty) {
+      for (final url in widget.cattle.imageUrls) {
+        addUrl(url);
+      }
+    } else {
+      addUrl(widget.cattle.imageUrl);
     }
 
     return ordered;
@@ -384,11 +390,14 @@ class _CattleDetailScreenState extends State<CattleDetailScreen> {
               },
               itemBuilder: (context, index) {
                 final url = _galleryUrls[index];
-                return Image.network(
-                  url,
+                return AppCachedNetworkImage(
                   key: Key('cattle-detail-main-image-$index'),
+                  imageUrl: url,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const _ImageFallback(),
+                  placeholder: Container(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                  errorBuilder: const _ImageFallback(),
                 );
               },
             ),
@@ -427,12 +436,17 @@ class _CattleDetailScreenState extends State<CattleDetailScreen> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      url,
+                    child: AppCachedNetworkImage(
+                      imageUrl: url,
                       width: 70,
                       height: 76,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      placeholder: Container(
+                        width: 70,
+                        height: 76,
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      ),
+                      errorBuilder: Container(
                         width: 70,
                         height: 76,
                         color: Theme.of(
@@ -922,12 +936,17 @@ class _CattleAvatar extends StatelessWidget {
     if (imageUrl.trim().isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          imageUrl,
+        child: AppCachedNetworkImage(
+          imageUrl: imageUrl,
           width: width,
           height: height,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const _AvatarFallback(),
+          placeholder: Container(
+            width: width,
+            height: height,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          ),
+          errorBuilder: const _AvatarFallback(),
         ),
       );
     }

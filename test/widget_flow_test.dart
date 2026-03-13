@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -130,6 +131,82 @@ void main() {
 
     await tester.pumpAndSettle();
     expect(find.textContaining('Nema aktivnih goveda'), findsOneWidget);
+  });
+
+  testWidgets('cattle list renders avatar images through cache widget', (
+    tester,
+  ) async {
+    final storage = const TokenStorage();
+    final client = ApiClient(tokenStorage: storage);
+
+    client.dio.interceptors.insert(
+      0,
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (options.path == '/api/gospodarstva/') {
+            handler.resolve(
+              Response<List<Map<String, dynamic>>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: [
+                  {
+                    'id': 1,
+                    'naziv_gospodarstva': 'OPG A',
+                    'naziv_farme': 'Farma A',
+                  },
+                ],
+              ),
+            );
+            return;
+          }
+
+          if (options.path == '/api/gospodarstva/1/animals/') {
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'animals': [
+                    {
+                      'govedo': {
+                        'id': 1,
+                        'zivotni_broj': 'HR00001234',
+                        'ime': 'Mila',
+                        'spol': 'Z',
+                        'datum_telenja': '2020-05-01',
+                        'slika_url': 'https://example.com/image-1.jpg',
+                        'potomci': [],
+                      },
+                    },
+                  ],
+                },
+              ),
+            );
+            return;
+          }
+
+          handler.reject(
+            DioException(
+              requestOptions: options,
+              type: DioExceptionType.unknown,
+            ),
+          );
+        },
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CattleListScreen(
+          farmsRepository: FarmsRepository(client: client),
+          cattleRepository: CattleRepository(client: client),
+          uploadRepository: UploadRepository(client: client),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(find.byType(CachedNetworkImage), findsWidgets);
   });
 
   testWidgets('upload screen validates required image before submit', (

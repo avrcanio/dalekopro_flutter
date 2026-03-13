@@ -107,4 +107,53 @@ void main() {
     expect(cattle.redniBroj, '7');
     expect(cattle.pasmina, 'Busa');
   });
+
+  test('prefers full image url over thumbnail in gallery items', () {
+    final cattle = Cattle.fromApi({
+      'govedo': {
+        'id': 1,
+        'zivotni_broj': 'HR1',
+        'ime': 'Mila',
+        'slike': [
+          {
+            'thumbnail_url': '/media/thumb-same.jpg',
+            'image_url': '/media/full-1.jpg',
+          },
+          {
+            'thumbnail_url': '/media/thumb-same.jpg',
+            'image_url': '/media/full-2.jpg',
+          },
+        ],
+      },
+    });
+
+    expect(cattle.imageUrls, hasLength(2));
+    expect(cattle.imageUrls[0], endsWith('/media/full-1.jpg'));
+    expect(cattle.imageUrls[1], endsWith('/media/full-2.jpg'));
+    expect(cattle.imageUrl, endsWith('/media/full-1.jpg'));
+  });
+
+  test('prefers image_url over url when both exist in gallery item map', () {
+    final cattle = Cattle.fromApi({
+      'govedo': {
+        'id': 1,
+        'zivotni_broj': 'HR1',
+        'ime': 'Mila',
+        'slike': [
+          {
+            'url': '/media/thumb-shared.jpg',
+            'image_url': '/media/full-1.jpg',
+          },
+          {
+            'url': '/media/thumb-shared.jpg',
+            'image_url': '/media/full-2.jpg',
+          },
+        ],
+      },
+    });
+
+    expect(cattle.imageUrls, hasLength(2));
+    expect(cattle.imageUrls[0], endsWith('/media/full-1.jpg'));
+    expect(cattle.imageUrls[1], endsWith('/media/full-2.jpg'));
+  });
 }

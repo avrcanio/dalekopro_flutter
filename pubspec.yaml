@@ -38,6 +38,8 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   image_picker: ^1.2.0
   image_cropper: ^9.1.0
+  cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
   geolocator: ^14.0.2
   intl: ^0.20.2
   exif: ^3.3.0
@@ -45,6 +47,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -63,6 +67,8 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  assets:
+    - assets/branding/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -94,3 +100,18 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/branding/launcher_icon.png
+  adaptive_icon_background: "#185C3A"
+  adaptive_icon_foreground: assets/branding/launcher_icon.png
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#F4F4EC"
+  image: assets/branding/splash_logo.png
+  android_12:
+    color: "#F4F4EC"
+    image: assets/branding/splash_logo.png

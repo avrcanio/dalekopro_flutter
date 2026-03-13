@@ -233,14 +233,18 @@ class Cattle {
     if (value is Map) {
       final map = value.cast<String, dynamic>();
       final urlCandidate =
-          map['url'] ??
-          map['profil_url'] ??
-          map['thumbnail_url'] ??
           map['slika_url'] ??
           map['image_url'] ??
           map['imageUrl'] ??
+          map['photo_url'] ??
+          map['photo'] ??
+          map['url'] ??
+          map['profil_url'] ??
           map['path'] ??
-          map['file'];
+          map['file'] ??
+          map['thumbnail_url'] ??
+          map['thumb_url'] ??
+          map['slika_thumbnail'];
       if (urlCandidate != null) {
         return _normalizeImageUrl(urlCandidate.toString());
       }
@@ -401,9 +405,9 @@ class Cattle {
     final imageUrls = _extractImageUrls(govedo, apiEntry);
     final thumbnailUrl = _extractThumbnailUrl(govedo, apiEntry);
     final extractedImageUrl = _extractImageUrl(govedo, apiEntry);
-    final primaryImageUrl = extractedImageUrl.isNotEmpty
-        ? extractedImageUrl
-        : (imageUrls.isNotEmpty ? imageUrls.first : '');
+    final primaryImageUrl = imageUrls.isNotEmpty
+        ? imageUrls.first
+        : extractedImageUrl;
 
     return Cattle(
       id: (govedo['id'] as num?)?.toInt() ?? 0,

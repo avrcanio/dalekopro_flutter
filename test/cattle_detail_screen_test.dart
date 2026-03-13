@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:dalekopro_farma_flutter/core/network/api_client.dart';
 import 'package:dalekopro_farma_flutter/core/storage/token_storage.dart';
@@ -154,14 +155,13 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await tester.scrollUntilVisible(
-      find.byKey(const Key('cattle-detail-thumb-2')),
+      find.byKey(const Key('cattle-detail-thumb-1')),
       200,
       scrollable: find.byType(Scrollable).first,
     );
 
     expect(thumbBorderWidth(tester, 0), 2);
     expect(thumbBorderWidth(tester, 1), 1);
-    expect(thumbBorderWidth(tester, 2), 1);
 
     await tester.fling(
       find.byKey(const Key('cattle-detail-pageview')),
@@ -171,13 +171,72 @@ void main() {
     await tester.pumpAndSettle();
     expect(thumbBorderWidth(tester, 0), 1);
 
-    await tester.tap(find.byKey(const Key('cattle-detail-thumb-2')));
+    await tester.tap(find.byKey(const Key('cattle-detail-thumb-1')));
     await tester.pumpAndSettle();
-    expect(thumbBorderWidth(tester, 2), 2);
+    expect(thumbBorderWidth(tester, 1), 2);
 
     await tester.pump(const Duration(seconds: 5));
     await tester.pump(const Duration(milliseconds: 400));
     expect(thumbBorderWidth(tester, 0), 2);
+  });
+
+  testWidgets('uses gallery-only thumbnails when gallery is available', (
+    tester,
+  ) async {
+    final cattle = buildCattle(
+      imageUrl: 'https://example.com/profile.jpg',
+      imageUrls: const [
+        'https://example.com/gallery-1.jpg',
+        'https://example.com/gallery-2.jpg',
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CattleDetailScreen(
+          cattle: cattle,
+          allCattle: const [],
+          cattleRepository: buildCattleRepository(),
+          uploadRepository: buildUploadRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('cattle-detail-thumb-1')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.byKey(const Key('cattle-detail-thumb-0')), findsOneWidget);
+    expect(find.byKey(const Key('cattle-detail-thumb-1')), findsOneWidget);
+    expect(find.byKey(const Key('cattle-detail-thumb-2')), findsNothing);
+  });
+
+  testWidgets('detail screen renders API images through cache widget', (
+    tester,
+  ) async {
+    final cattle = buildCattle(
+      imageUrl: 'https://example.com/profile.jpg',
+      imageUrls: const [
+        'https://example.com/gallery-1.jpg',
+        'https://example.com/gallery-2.jpg',
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CattleDetailScreen(
+          cattle: cattle,
+          allCattle: const [],
+          cattleRepository: buildCattleRepository(),
+          uploadRepository: buildUploadRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CachedNetworkImage), findsWidgets);
   });
 
   testWidgets('renders majka and otac in structured format', (tester) async {
