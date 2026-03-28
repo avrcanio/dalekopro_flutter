@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/storage/saf_bridge.dart';
 import '../../../core/storage/token_storage.dart';
+import '../../../core/widgets/screen_insets.dart';
 import '../../../core/widgets/status_widgets.dart';
 import '../../cattle/models/cattle.dart';
 import '../data/upload_repository.dart';
@@ -307,11 +308,20 @@ class _UploadScreenState extends State<UploadScreen> {
     try {
       final cropped = await _cropper.cropImage(
         sourcePath: file.path,
+        // Keep the crop frame fixed to a portrait 9:16 ratio.
+        // Users can still resize it, but only proportionally.
+        aspectRatio: const CropAspectRatio(ratioX: 9, ratioY: 16),
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: 'Uredi sliku',
-            hideBottomControls: false,
-            lockAspectRatio: false,
+            toolbarColor: Colors.white,
+            toolbarWidgetColor: Colors.black,
+            backgroundColor: Colors.black,
+            statusBarLight: true,
+            // uCrop bottom controls can sit under Android 3-button navigation.
+            // Hide them so the crop screen stays usable across devices.
+            hideBottomControls: true,
+            lockAspectRatio: true,
           ),
         ],
       );
@@ -408,172 +418,177 @@ class _UploadScreenState extends State<UploadScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Upload slike goveda')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          RawAutocomplete<Cattle>(
-            textEditingController: _cattleSearchController,
-            focusNode: _cattleSearchFocusNode,
-            optionsBuilder: (value) {
-              if (_uploading) {
-                return const Iterable<Cattle>.empty();
-              }
-              final query = value.text;
-              return widget.cattle.where((item) => _matchesCattleQuery(item, query));
-            },
-            displayStringForOption: _cattleOptionLabel,
-            onSelected: (value) {
-              setState(() {
-                _selectedCattle = value;
-              });
-              _cattleSearchController.text = _cattleOptionLabel(value);
-            },
-            fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
-              return TextFormField(
-                controller: controller,
-                focusNode: focusNode,
-                enabled: !_uploading,
-                decoration: InputDecoration(
-                  labelText: 'Zivotni broj goveda (search)',
-                  hintText: 'Unesi 1-4 znamenke, vise od 4 ili ime',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: controller.text.trim().isEmpty
-                      ? null
-                      : IconButton(
-                          onPressed: () {
-                            controller.clear();
-                            setState(() {
-                              _selectedCattle = null;
-                            });
-                          },
-                          icon: const Icon(Icons.clear),
-                        ),
-                ),
-                onChanged: (value) {
-                  final selected = _selectedCattle;
-                  if (selected != null && value != _cattleOptionLabel(selected)) {
-                    setState(() {
-                      _selectedCattle = null;
-                    });
-                  } else {
-                    setState(() {});
-                  }
-                },
-                onFieldSubmitted: (_) => onSubmitted(),
-              );
-            },
-            optionsViewBuilder: (context, onSelected, options) {
-              final optionList = options.toList(growable: false);
-              return Align(
-                alignment: Alignment.topLeft,
-                child: Material(
-                  elevation: 4,
-                  borderRadius: BorderRadius.circular(8),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 240),
-                    child: optionList.isEmpty
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: Text('Nema rezultata pretrage.'),
-                          )
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            padding: EdgeInsets.zero,
-                            itemCount: optionList.length,
-                            itemBuilder: (context, index) {
-                              final item = optionList[index];
-                              return ListTile(
-                                title: Text(item.zivotniBroj),
-                                subtitle: Text(item.displayName),
-                                onTap: () => onSelected(item),
-                              );
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        minimum: const EdgeInsets.only(bottom: 16),
+        child: ListView(
+          padding: screenBodyPadding(context, bottomSpacing: 0),
+          children: [
+            RawAutocomplete<Cattle>(
+              textEditingController: _cattleSearchController,
+              focusNode: _cattleSearchFocusNode,
+              optionsBuilder: (value) {
+                if (_uploading) {
+                  return const Iterable<Cattle>.empty();
+                }
+                final query = value.text;
+                return widget.cattle.where((item) => _matchesCattleQuery(item, query));
+              },
+              displayStringForOption: _cattleOptionLabel,
+              onSelected: (value) {
+                setState(() {
+                  _selectedCattle = value;
+                });
+                _cattleSearchController.text = _cattleOptionLabel(value);
+              },
+              fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+                return TextFormField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  enabled: !_uploading,
+                  decoration: InputDecoration(
+                    labelText: 'Zivotni broj goveda (search)',
+                    hintText: 'Unesi 1-4 znamenke, vise od 4 ili ime',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: controller.text.trim().isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: () {
+                              controller.clear();
+                              setState(() {
+                                _selectedCattle = null;
+                              });
                             },
+                            icon: const Icon(Icons.clear),
                           ),
                   ),
+                  onChanged: (value) {
+                    final selected = _selectedCattle;
+                    if (selected != null && value != _cattleOptionLabel(selected)) {
+                      setState(() {
+                        _selectedCattle = null;
+                      });
+                    } else {
+                      setState(() {});
+                    }
+                  },
+                  onFieldSubmitted: (_) => onSubmitted(),
+                );
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                final optionList = options.toList(growable: false);
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(8),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 240),
+                      child: optionList.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Text('Nema rezultata pretrage.'),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              padding: EdgeInsets.zero,
+                              itemCount: optionList.length,
+                              itemBuilder: (context, index) {
+                                final item = optionList[index];
+                                return ListTile(
+                                  title: Text(item.zivotniBroj),
+                                  subtitle: Text(item.displayName),
+                                  onTap: () => onSelected(item),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            if (_selectedCattle == null)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  'Odaberi govedo iz rezultata pretrage.',
+                  style: TextStyle(color: Colors.orange),
                 ),
-              );
-            },
-          ),
-          if (_selectedCattle == null)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                'Odaberi govedo iz rezultata pretrage.',
-                style: TextStyle(color: Colors.orange),
+              ),
+            const SizedBox(height: 16),
+            ListTile(
+              title: const Text('EXIF metadata'),
+              subtitle: Text(
+                'Datum: ${_exifDate ?? "Nije dostupan"}\n'
+                'GPS: ${(_exifLatitude != null && _exifLongitude != null) ? "${_exifLatitude!.toStringAsFixed(6)}, ${_exifLongitude!.toStringAsFixed(6)}" : "Nije dostupan"}',
               ),
             ),
-          const SizedBox(height: 16),
-          ListTile(
-            title: const Text('EXIF metadata'),
-            subtitle: Text(
-              'Datum: ${_exifDate ?? "Nije dostupan"}\n'
-              'GPS: ${(_exifLatitude != null && _exifLongitude != null) ? "${_exifLatitude!.toStringAsFixed(6)}, ${_exifLongitude!.toStringAsFixed(6)}" : "Nije dostupan"}',
-            ),
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            title: const Text('SAF folder URI'),
-            subtitle: Text(_folderUri ?? 'Nije odabran folder'),
-            trailing: OutlinedButton(
-              onPressed: _uploading ? null : _selectFolder,
-              child: const Text('Odaberi'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              FilledButton.icon(
-                onPressed: _uploading ? null : _pickFromCamera,
-                icon: const Icon(Icons.photo_camera),
-                label: const Text('Slikaj'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _uploading ? null : _pickFromSelectedFolder,
-                icon: const Icon(Icons.folder_open),
-                label: const Text('Iz SAF foldera'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (_selectedImage != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                _selectedImage!,
-                height: 260,
-                fit: BoxFit.cover,
-              ),
-            )
-          else
-            const InlineStatusMessage(
-              message: 'Nema odabrane slike za upload.',
-              type: StatusType.info,
-            ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _uploading ? null : _upload,
-              child: _uploading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Upload'),
-            ),
-          ),
-          if (_message != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: InlineStatusMessage(
-                message: _message!,
-                type: _messageType,
+            const SizedBox(height: 16),
+            ListTile(
+              title: const Text('SAF folder URI'),
+              subtitle: Text(_folderUri ?? 'Nije odabran folder'),
+              trailing: OutlinedButton(
+                onPressed: _uploading ? null : _selectFolder,
+                child: const Text('Odaberi'),
               ),
             ),
-        ],
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FilledButton.icon(
+                  onPressed: _uploading ? null : _pickFromCamera,
+                  icon: const Icon(Icons.photo_camera),
+                  label: const Text('Slikaj'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _uploading ? null : _pickFromSelectedFolder,
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Iz SAF foldera'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_selectedImage != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  _selectedImage!,
+                  height: 260,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              const InlineStatusMessage(
+                message: 'Nema odabrane slike za upload.',
+                type: StatusType.info,
+              ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _uploading ? null : _upload,
+                child: _uploading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Upload'),
+              ),
+            ),
+            if (_message != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: InlineStatusMessage(
+                  message: _message!,
+                  type: _messageType,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

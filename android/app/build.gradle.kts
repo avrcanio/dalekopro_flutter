@@ -5,8 +5,17 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.util.Properties
+
+val sharedKeyProperties = Properties()
+val sharedKeyPropertiesFile = rootProject.file("../../key.properties")
+
+if (sharedKeyPropertiesFile.exists()) {
+    sharedKeyPropertiesFile.inputStream().use { sharedKeyProperties.load(it) }
+}
+
 android {
-    namespace = "com.example.dalekopro_farma_flutter"
+    namespace = "hr.dalekopro.farma"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,8 +29,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.dalekopro_farma_flutter"
+        applicationId = "hr.dalekopro.farma"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -30,11 +38,24 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (sharedKeyPropertiesFile.exists()) {
+                keyAlias = sharedKeyProperties["keyAlias"] as String
+                keyPassword = sharedKeyProperties["keyPassword"] as String
+                storeFile = file(sharedKeyProperties["storeFile"] as String)
+                storePassword = sharedKeyProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (sharedKeyPropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

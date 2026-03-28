@@ -1,4 +1,4 @@
-﻿package com.example.dalekopro_farma_flutter
+package hr.dalekopro.farma
 
 import android.app.Activity
 import android.content.Intent
