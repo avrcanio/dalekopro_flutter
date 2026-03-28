@@ -7,6 +7,7 @@ import 'package:dalekopro_farma_flutter/core/storage/token_storage.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/data/cattle_repository.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/presentation/cattle_list_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
+import 'package:dalekopro_farma_flutter/features/farms/models/farm.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
 
 import 'test_helpers.dart';
@@ -43,6 +44,11 @@ void main() {
                     'naziv_gospodarstva': 'OPG A',
                     'naziv_farme': 'Farma A',
                   },
+                  {
+                    'id': 2,
+                    'naziv_gospodarstva': 'OPG B',
+                    'naziv_farme': 'Farma B',
+                  },
                 ],
               ),
             );
@@ -62,6 +68,8 @@ void main() {
                         'zivotni_broj': 'HR0001',
                         'ime': 'BikOne',
                         'uzrast': {'naziv': 'Bik'},
+                        'posjed_veza_id': 10,
+                        'posjed': {'naziv': 'Kuća'},
                         'potomci': [],
                       },
                     },
@@ -71,6 +79,8 @@ void main() {
                         'zivotni_broj': 'HR0002',
                         'ime': 'KravaOne',
                         'uzrast': {'naziv': 'Krava'},
+                        'posjed_veza_id': 10,
+                        'posjed': {'naziv': 'Kuća'},
                         'potomci': [],
                       },
                     },
@@ -80,6 +90,8 @@ void main() {
                         'zivotni_broj': 'HR0003',
                         'ime': 'JunacOne',
                         'uzrast': {'naziv': 'Junac'},
+                        'posjed_veza_id': 11,
+                        'posjed': {'naziv': 'Pašnjak'},
                         'potomci': [],
                       },
                     },
@@ -89,6 +101,8 @@ void main() {
                         'zivotni_broj': 'HR0004',
                         'ime': 'JunicaOne',
                         'uzrast': {'naziv': 'Junica'},
+                        'posjed_veza_id': 11,
+                        'posjed': {'naziv': 'Pašnjak'},
                         'potomci': [],
                       },
                     },
@@ -98,6 +112,8 @@ void main() {
                         'zivotni_broj': 'HR0005',
                         'ime': 'TeleM',
                         'uzrast': {'naziv': 'Tele musko'},
+                        'posjed_veza_id': 12,
+                        'posjed': {'naziv': 'Štala'},
                         'potomci': [],
                       },
                     },
@@ -107,6 +123,8 @@ void main() {
                         'zivotni_broj': 'HR0006',
                         'ime': 'TeleZ',
                         'uzrast': {'naziv': 'Tele zensko'},
+                        'posjed_veza_id': 12,
+                        'posjed': {'naziv': 'Štala'},
                         'potomci': [],
                       },
                     },
@@ -116,6 +134,44 @@ void main() {
                         'zivotni_broj': 'HR0007',
                         'ime': 'UnknownOne',
                         'uzrast': {'naziv': 'Senior'},
+                        'posjed_veza_id': 13,
+                        'posjed': {'naziv': 'Ispust'},
+                        'potomci': [],
+                      },
+                    },
+                  ],
+                },
+              ),
+            );
+            return;
+          }
+
+          if (options.path == '/api/gospodarstva/2/animals/') {
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'animals': [
+                    {
+                      'govedo': {
+                        'id': 21,
+                        'zivotni_broj': 'HR2001',
+                        'ime': 'Farm2Krava',
+                        'uzrast': {'naziv': 'Krava'},
+                        'posjed_veza_id': 20,
+                        'posjed': {'naziv': 'Brdo'},
+                        'potomci': [],
+                      },
+                    },
+                    {
+                      'govedo': {
+                        'id': 22,
+                        'zivotni_broj': 'HR2002',
+                        'ime': 'Farm2Tele',
+                        'uzrast': {'naziv': 'Tele musko'},
+                        'posjed_veza_id': 21,
+                        'posjed': {'naziv': 'Dolina'},
                         'potomci': [],
                       },
                     },
@@ -195,5 +251,93 @@ void main() {
     await tester.tap(find.text('Bik (1)'));
     await tester.pumpAndSettle();
     expect(find.text('BikOne'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows all holdings by default and updates counts for one holding',
+    (tester) async {
+      await pumpScreen(tester);
+
+      expect(find.text('Goveda (7)'), findsOneWidget);
+      expect(find.byKey(const Key('holding-filter-summary')), findsOneWidget);
+      expect(find.text('Svi posjedi'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('holding-filter-field')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('holding-filter-option-id:10')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Primijeni'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Posjedi (1 odabrano)'), findsOneWidget);
+      expect(find.text('Goveda (2)'), findsOneWidget);
+      expect(find.text('Bik (1)'), findsOneWidget);
+      expect(find.text('Krava (1)'), findsOneWidget);
+      expect(find.text('BikOne'), findsOneWidget);
+      expect(find.text('KravaOne'), findsOneWidget);
+      expect(find.text('JunacOne'), findsNothing);
+      expect(find.text('TeleM'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'supports multiple holdings and combines search with holding filter',
+    (tester) async {
+      await pumpScreen(tester);
+
+      await tester.tap(find.byKey(const Key('holding-filter-field')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('holding-filter-option-id:10')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('holding-filter-option-id:11')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Primijeni'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Posjedi (2 odabrano)'), findsOneWidget);
+      expect(find.text('Goveda (4)'), findsOneWidget);
+      expect(find.text('Bik (1)'), findsOneWidget);
+      expect(find.text('Krava (1)'), findsOneWidget);
+      expect(find.text('BikOne'), findsOneWidget);
+      expect(find.text('KravaOne'), findsOneWidget);
+      expect(find.text('JunacOne'), findsOneWidget);
+      expect(find.text('TeleM'), findsNothing);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Pretraga po zivotnom broju'),
+        '0003',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Goveda (1)'), findsOneWidget);
+      expect(find.text('June (1)'), findsOneWidget);
+      expect(find.text('JunacOne'), findsOneWidget);
+      expect(find.text('KravaOne'), findsNothing);
+    },
+  );
+
+  testWidgets('resets holding filter when active farm changes', (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('holding-filter-field')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('holding-filter-option-id:10')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Primijeni'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Goveda (2)'), findsOneWidget);
+    expect(find.text('Posjedi (1 odabrano)'), findsOneWidget);
+
+    await tester.tap(find.byType(DropdownButtonFormField<Farm>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OPG B (Farma B)').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Svi posjedi'), findsOneWidget);
+    expect(find.text('Goveda (2)'), findsOneWidget);
+    expect(find.text('Farm2Krava'), findsOneWidget);
+    expect(find.text('Farm2Tele'), findsOneWidget);
+    expect(find.text('BikOne'), findsNothing);
   });
 }

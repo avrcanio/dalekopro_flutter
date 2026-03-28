@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/widgets/app_cached_network_image.dart';
+import '../../../core/widgets/screen_insets.dart';
 import '../../../core/widgets/status_widgets.dart';
 import '../../farms/data/farms_repository.dart';
 import '../../farms/models/farm.dart';
@@ -191,7 +192,9 @@ class _CattleDetailScreenState extends State<CattleDetailScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Neuspjelo ucitavanje detalja roditelja.')),
+        const SnackBar(
+          content: Text('Neuspjelo ucitavanje detalja roditelja.'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -289,80 +292,85 @@ class _CattleDetailScreenState extends State<CattleDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(cattle.displayName)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildImageSection(context),
-          const SizedBox(height: 16),
-          if (widget.showOutsideFarmNotice) ...[
-            const Card(
-              color: Color(0xFFFFF3CD),
-              child: Padding(
-                padding: EdgeInsets.all(12),
-                child: Text('Govedo nije na aktivnom gospodarstvu.'),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          Text('Posjed: ${_displayOrFallback(cattle.posjed)}'),
-          Text('Rbr.: ${_displayOrFallback(cattle.redniBroj)}'),
-          Text('Zivotni broj: ${cattle.zivotniBroj}'),
-          Text('Ime: ${_displayOrFallback(cattle.ime)}'),
-          Text('Spol: ${_displayOrFallback(cattle.spol)}'),
-          Text('Pasmina: ${_displayOrFallback(cattle.pasmina)}'),
-          Text('Datum telenja: ${_displayOrFallback(cattle.datumTelenja)}'),
-          Text('Uzrast: ${_displayOrFallback(cattle.uzrast)}'),
-          _buildParentField(
-            label: 'Majka',
-            parent: cattle.majkaRef,
-            fallback: cattle.majka,
-            relationKey: 'majka',
-          ),
-          _buildParentField(
-            label: 'Otac',
-            parent: cattle.otacRef,
-            fallback: cattle.otac,
-            relationKey: 'otac',
-            clickable: false,
-          ),
-          if (cattle.potomci.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Text(
-              'Potomci:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            ...cattle.potomci.map((descendant) {
-              return Card(
-                margin: const EdgeInsets.only(top: 8),
-                child: ListTile(
-                  title: Text(
-                    'Zivotni broj: ${_displayOrFallback(descendant.zivotniBroj)}',
-                  ),
-                  subtitle: Text(
-                    'Ime: ${_displayOrFallback(descendant.ime)}\n'
-                    'Datum telenja: ${_displayOrFallback(descendant.datumTelenja)}\n'
-                    'Spol: ${_displayOrFallback(descendant.spol)}',
-                  ),
-                  isThreeLine: true,
-                  trailing: const Icon(Icons.open_in_new),
-                  onTap: () {
-                    final profile = _resolveDescendantProfile(descendant);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CattleDetailScreen(
-                          cattle: profile,
-                          allCattle: allCattle,
-                          cattleRepository: widget.cattleRepository,
-                          uploadRepository: uploadRepository,
-                        ),
-                      ),
-                    );
-                  },
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        minimum: const EdgeInsets.only(bottom: 16),
+        child: ListView(
+          padding: screenBodyPadding(context, bottomSpacing: 0),
+          children: [
+            _buildImageSection(context),
+            const SizedBox(height: 16),
+            if (widget.showOutsideFarmNotice) ...[
+              const Card(
+                color: Color(0xFFFFF3CD),
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text('Govedo nije na aktivnom gospodarstvu.'),
                 ),
-              );
-            }),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Text('Posjed: ${_displayOrFallback(cattle.posjed)}'),
+            Text('Rbr.: ${_displayOrFallback(cattle.redniBroj)}'),
+            Text('Zivotni broj: ${cattle.zivotniBroj}'),
+            Text('Ime: ${_displayOrFallback(cattle.ime)}'),
+            Text('Spol: ${_displayOrFallback(cattle.spol)}'),
+            Text('Pasmina: ${_displayOrFallback(cattle.pasmina)}'),
+            Text('Datum telenja: ${_displayOrFallback(cattle.datumTelenja)}'),
+            Text('Uzrast: ${_displayOrFallback(cattle.uzrast)}'),
+            _buildParentField(
+              label: 'Majka',
+              parent: cattle.majkaRef,
+              fallback: cattle.majka,
+              relationKey: 'majka',
+            ),
+            _buildParentField(
+              label: 'Otac',
+              parent: cattle.otacRef,
+              fallback: cattle.otac,
+              relationKey: 'otac',
+              clickable: false,
+            ),
+            if (cattle.potomci.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Potomci:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              ...cattle.potomci.map((descendant) {
+                return Card(
+                  margin: const EdgeInsets.only(top: 8),
+                  child: ListTile(
+                    title: Text(
+                      'Zivotni broj: ${_displayOrFallback(descendant.zivotniBroj)}',
+                    ),
+                    subtitle: Text(
+                      'Ime: ${_displayOrFallback(descendant.ime)}\n'
+                      'Datum telenja: ${_displayOrFallback(descendant.datumTelenja)}\n'
+                      'Spol: ${_displayOrFallback(descendant.spol)}',
+                    ),
+                    isThreeLine: true,
+                    trailing: const Icon(Icons.open_in_new),
+                    onTap: () {
+                      final profile = _resolveDescendantProfile(descendant);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => CattleDetailScreen(
+                            cattle: profile,
+                            allCattle: allCattle,
+                            cattleRepository: widget.cattleRepository,
+                            uploadRepository: uploadRepository,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -395,7 +403,9 @@ class _CattleDetailScreenState extends State<CattleDetailScreen> {
                   imageUrl: url,
                   fit: BoxFit.cover,
                   placeholder: Container(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                   ),
                   errorBuilder: const _ImageFallback(),
                 );
@@ -444,7 +454,9 @@ class _CattleDetailScreenState extends State<CattleDetailScreen> {
                       placeholder: Container(
                         width: 70,
                         height: 76,
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
                       ),
                       errorBuilder: Container(
                         width: 70,
@@ -498,6 +510,7 @@ class _CattleListScreenState extends State<CattleListScreen> {
   Farm? _activeFarm;
   List<Cattle> _cattle = const [];
   String _searchQuery = '';
+  Set<String> _selectedHoldingKeys = <String>{};
   final Map<String, bool> _expandedGroups = <String, bool>{};
   final TextEditingController _searchController = TextEditingController();
 
@@ -531,6 +544,7 @@ class _CattleListScreenState extends State<CattleListScreen> {
         _farms = farms;
         _activeFarm = farm;
         _cattle = cattle;
+        _selectedHoldingKeys = <String>{};
       });
     } catch (_) {
       if (!mounted) return;
@@ -559,6 +573,7 @@ class _CattleListScreenState extends State<CattleListScreen> {
       if (!mounted) return;
       setState(() {
         _cattle = cattle;
+        _selectedHoldingKeys = <String>{};
       });
     } catch (_) {
       if (!mounted) return;
@@ -580,6 +595,28 @@ class _CattleListScreenState extends State<CattleListScreen> {
 
   static String _compact(String value) {
     return value.replaceAll(RegExp(r'\s+'), '');
+  }
+
+  static String _normalizeHoldingLabel(String value) {
+    return value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+  }
+
+  static String _holdingKeyForCattle(Cattle item) {
+    if (item.posjedVezaId > 0) {
+      return 'id:${item.posjedVezaId}';
+    }
+
+    final normalizedLabel = _normalizeHoldingLabel(item.posjed);
+    if (normalizedLabel.isNotEmpty) {
+      return 'label:$normalizedLabel';
+    }
+
+    return '';
+  }
+
+  static String _holdingLabelForCattle(Cattle item) {
+    final label = item.posjed.trim();
+    return label.isEmpty ? 'Nepoznati posjed' : label;
   }
 
   static bool _matchesSearch(Cattle item, String query) {
@@ -605,8 +642,141 @@ class _CattleListScreenState extends State<CattleListScreen> {
     return fullNumber.contains(compactQuery.toUpperCase());
   }
 
+  List<_HoldingFilterOption> _holdingOptions() {
+    final optionsByKey = <String, _HoldingFilterOption>{};
+    for (final item in _cattle) {
+      final key = _holdingKeyForCattle(item);
+      if (key.isEmpty) {
+        continue;
+      }
+
+      final label = _holdingLabelForCattle(item);
+      final existing = optionsByKey[key];
+      if (existing == null || existing.label == 'Nepoznati posjed') {
+        optionsByKey[key] = _HoldingFilterOption(key: key, label: label);
+      }
+    }
+
+    final options = optionsByKey.values.toList();
+    options.sort(
+      (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()),
+    );
+    return options;
+  }
+
+  List<Cattle> _cattleFilteredByHolding() {
+    if (_selectedHoldingKeys.isEmpty) {
+      return _cattle;
+    }
+
+    return _cattle.where((item) {
+      final key = _holdingKeyForCattle(item);
+      return key.isNotEmpty && _selectedHoldingKeys.contains(key);
+    }).toList();
+  }
+
   List<Cattle> _filteredCattle() {
-    return _cattle.where((item) => _matchesSearch(item, _searchQuery)).toList();
+    final holdingFilteredCattle = _cattleFilteredByHolding();
+    return holdingFilteredCattle
+        .where((item) => _matchesSearch(item, _searchQuery))
+        .toList();
+  }
+
+  String _holdingFilterSummary(List<_HoldingFilterOption> options) {
+    if (_selectedHoldingKeys.isEmpty || options.isEmpty) {
+      return 'Svi posjedi';
+    }
+
+    return 'Posjedi (${_selectedHoldingKeys.length} odabrano)';
+  }
+
+  Future<void> _showHoldingFilterDialog() async {
+    final options = _holdingOptions();
+    final initialSelection = Set<String>.from(_selectedHoldingKeys);
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (context) {
+        var tempSelection = Set<String>.from(initialSelection);
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Filter po posjedima'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: options.isEmpty
+                    ? const Text(
+                        'Nema dostupnih posjeda. Prikazuju se svi posjedi.',
+                      )
+                    : SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CheckboxListTile(
+                              key: const Key('holding-filter-all'),
+                              value: tempSelection.isEmpty,
+                              title: const Text('Svi posjedi'),
+                              controlAffinity: ListTileControlAffinity.leading,
+                              onChanged: (_) {
+                                setDialogState(() {
+                                  tempSelection = <String>{};
+                                });
+                              },
+                            ),
+                            const Divider(height: 8),
+                            ...options.map(
+                              (option) => CheckboxListTile(
+                                key: Key('holding-filter-option-${option.key}'),
+                                value: tempSelection.contains(option.key),
+                                title: Text(option.label),
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                onChanged: (checked) {
+                                  setDialogState(() {
+                                    if (checked ?? false) {
+                                      tempSelection.add(option.key);
+                                    } else {
+                                      tempSelection.remove(option.key);
+                                    }
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Odustani'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setDialogState(() {
+                      tempSelection = <String>{};
+                    });
+                  },
+                  child: const Text('Resetiraj'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(tempSelection),
+                  child: const Text('Primijeni'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedHoldingKeys = result;
+    });
   }
 
   static String _uzrastGroupLabel(Cattle item) {
@@ -662,9 +832,9 @@ class _CattleListScreenState extends State<CattleListScreen> {
     }
 
     known.sort(
-      (a, b) => _orderedUzrastGroups.indexOf(a).compareTo(
-        _orderedUzrastGroups.indexOf(b),
-      ),
+      (a, b) => _orderedUzrastGroups
+          .indexOf(a)
+          .compareTo(_orderedUzrastGroups.indexOf(b)),
     );
     unknown.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
@@ -673,10 +843,12 @@ class _CattleListScreenState extends State<CattleListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom + 16;
     Widget content;
     var contentHasInternalRefresh = false;
+    final holdingOptions = _holdingOptions();
     final filteredCattle = _filteredCattle();
-    final totalCattleCount = _cattle.length;
+    final totalCattleCount = filteredCattle.length;
     final groupedCattle = _groupCattleByUzrast(filteredCattle);
     final groupedKeys = _sortGroupKeys(groupedCattle);
 
@@ -796,13 +968,13 @@ class _CattleListScreenState extends State<CattleListScreen> {
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                        builder: (_) => CattleDetailScreen(
-                          cattle: item,
-                          allCattle: _cattle,
-                          cattleRepository: widget.cattleRepository,
-                          uploadRepository: widget.uploadRepository,
-                        ),
-                      ),
+                            builder: (_) => CattleDetailScreen(
+                              cattle: item,
+                              allCattle: _cattle,
+                              cattleRepository: widget.cattleRepository,
+                              uploadRepository: widget.uploadRepository,
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -853,6 +1025,24 @@ class _CattleListScreenState extends State<CattleListScreen> {
             ),
           ),
           Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: InkWell(
+              key: const Key('holding-filter-field'),
+              onTap: _loading ? null : _showHoldingFilterDialog,
+              borderRadius: BorderRadius.circular(4),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Filter po posjedima',
+                  suffixIcon: Icon(Icons.arrow_drop_down),
+                ),
+                child: Text(
+                  _holdingFilterSummary(holdingOptions),
+                  key: const Key('holding-filter-summary'),
+                ),
+              ),
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: TextField(
               controller: _searchController,
@@ -885,7 +1075,7 @@ class _CattleListScreenState extends State<CattleListScreen> {
               onRefresh: _loadData,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
                 children: listChildren,
               ),
             ),
@@ -896,11 +1086,23 @@ class _CattleListScreenState extends State<CattleListScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text('Goveda ($totalCattleCount)')),
-      body: contentHasInternalRefresh
-          ? content
-          : RefreshIndicator(onRefresh: _loadData, child: content),
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        minimum: const EdgeInsets.only(bottom: 16),
+        child: contentHasInternalRefresh
+            ? content
+            : RefreshIndicator(onRefresh: _loadData, child: content),
+      ),
     );
   }
+}
+
+class _HoldingFilterOption {
+  const _HoldingFilterOption({required this.key, required this.label});
+
+  final String key;
+  final String label;
 }
 
 class _ImageFallback extends StatelessWidget {
