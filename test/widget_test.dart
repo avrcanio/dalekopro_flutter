@@ -49,15 +49,13 @@ void main() {
 
   test('maps posjed from root entry when missing in govedo', () {
     final cattle = Cattle.fromApi({
+      'posjed_veza_id': 19,
       'posjed': {'naziv': 'Kuca'},
-      'govedo': {
-        'id': 1,
-        'zivotni_broj': 'HR1',
-        'ime': 'Mila',
-      },
+      'govedo': {'id': 1, 'zivotni_broj': 'HR1', 'ime': 'Mila'},
     });
 
     expect(cattle.posjed, 'Kuca');
+    expect(cattle.posjedVezaId, 19);
   });
 
   test('maps majka and otac structured refs', () {
@@ -71,11 +69,7 @@ void main() {
           'zivotni_broj': 'HR 1201164650',
           'ime': 'BELA B126',
         },
-        'otac': {
-          'id': 1,
-          'hb_broj': '87000000158',
-          'ime': 'JABLAN LB4',
-        },
+        'otac': {'id': 1, 'hb_broj': '87000000158', 'ime': 'JABLAN LB4'},
       },
     });
 
@@ -97,10 +91,7 @@ void main() {
         'id': 314,
         'zivotni_broj': 'HR 5201996842',
         'ime': 'JOVICA',
-        'pasmina': {
-          'id': 87,
-          'naziv': 'Busa',
-        },
+        'pasmina': {'id': 87, 'naziv': 'Busa'},
       },
     });
 
@@ -140,14 +131,8 @@ void main() {
         'zivotni_broj': 'HR1',
         'ime': 'Mila',
         'slike': [
-          {
-            'url': '/media/thumb-shared.jpg',
-            'image_url': '/media/full-1.jpg',
-          },
-          {
-            'url': '/media/thumb-shared.jpg',
-            'image_url': '/media/full-2.jpg',
-          },
+          {'url': '/media/thumb-shared.jpg', 'image_url': '/media/full-1.jpg'},
+          {'url': '/media/thumb-shared.jpg', 'image_url': '/media/full-2.jpg'},
         ],
       },
     });

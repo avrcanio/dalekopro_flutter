@@ -10,6 +10,7 @@ import 'package:dalekopro_farma_flutter/features/auth/presentation/login_screen.
 import 'package:dalekopro_farma_flutter/features/cattle/data/cattle_repository.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/models/cattle.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/presentation/cattle_list_screen.dart';
+import 'package:dalekopro_farma_flutter/features/cattle_transfer/data/cattle_transfer_repository.dart';
 import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
@@ -316,6 +317,7 @@ void main() {
           home: DashboardScreen(
             farmsRepository: FarmsRepository(client: client),
             cattleRepository: CattleRepository(client: client),
+            cattleTransferRepository: CattleTransferRepository(client: client),
             uploadRepository: UploadRepository(client: client),
             onLogout: () async {},
           ),
@@ -323,9 +325,13 @@ void main() {
       );
 
       expect(find.text('Pocetni dashboard'), findsOneWidget);
-      expect(find.widgetWithText(DropdownButtonFormField<String>, 'Odaberi opciju'), findsOneWidget);
+      expect(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Odaberi opciju'),
+        findsOneWidget,
+      );
       expect(find.text('Goveda'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Upload'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Premjestanje'), findsOneWidget);
 
       await tester.tap(find.text('Goveda'));
       await tester.pumpAndSettle();
@@ -343,6 +349,14 @@ void main() {
 
       expect(find.text('Upload slike goveda'), findsOneWidget);
       expect(find.textContaining('HR00001234'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Premjestanje'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Premještanje goveda'), findsOneWidget);
     },
   );
 

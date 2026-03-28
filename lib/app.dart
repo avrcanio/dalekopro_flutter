@@ -5,6 +5,7 @@ import 'core/storage/token_storage.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cattle/data/cattle_repository.dart';
+import 'features/cattle_transfer/data/cattle_transfer_repository.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/farms/data/farms_repository.dart';
 import 'features/upload/data/upload_repository.dart';
@@ -59,6 +60,7 @@ class _DalekoproAppState extends State<DalekoproApp> {
     );
     final farmsRepository = FarmsRepository(client: client);
     final cattleRepository = CattleRepository(client: client);
+    final cattleTransferRepository = CattleTransferRepository(client: client);
     final uploadRepository = UploadRepository(client: client);
 
     return MaterialApp(
@@ -73,6 +75,7 @@ class _DalekoproAppState extends State<DalekoproApp> {
                 : DashboardScreen(
                     farmsRepository: farmsRepository,
                     cattleRepository: cattleRepository,
+                    cattleTransferRepository: cattleTransferRepository,
                     uploadRepository: uploadRepository,
                     onLogout: _logout,
                   )),

@@ -59,6 +59,7 @@ class Cattle {
     this.pasmina = '',
     required this.datumTelenja,
     this.posjed = '',
+    this.posjedVezaId = 0,
     required this.uzrast,
     required this.majka,
     required this.otac,
@@ -79,6 +80,7 @@ class Cattle {
   final String pasmina;
   final String datumTelenja;
   final String posjed;
+  final int posjedVezaId;
   final String uzrast;
   final String majka;
   final String otac;
@@ -115,16 +117,8 @@ class Cattle {
     final id = (map['id'] as num?)?.toInt() ?? 0;
     final ime = map['ime']?.toString() ?? '';
     final brojCandidates = preferHbBroj
-        ? <dynamic>[
-            map['hb_broj'],
-            map['zivotni_broj'],
-            map['broj'],
-          ]
-        : <dynamic>[
-            map['zivotni_broj'],
-            map['hb_broj'],
-            map['broj'],
-          ];
+        ? <dynamic>[map['hb_broj'], map['zivotni_broj'], map['broj']]
+        : <dynamic>[map['zivotni_broj'], map['hb_broj'], map['broj']];
 
     var broj = '';
     for (final candidate in brojCandidates) {
@@ -176,6 +170,57 @@ class Cattle {
     }
 
     return '';
+  }
+
+  static int _extractPosjedVezaId(
+    Map<String, dynamic> govedo,
+    Map<String, dynamic> apiEntry,
+  ) {
+    final candidates = <dynamic>[
+      govedo['posjed_veza_id'],
+      apiEntry['posjed_veza_id'],
+      govedo['posjed_id'],
+      apiEntry['posjed_id'],
+      govedo['posjed'],
+      apiEntry['posjed'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate == null) continue;
+      if (candidate is num) {
+        final value = candidate.toInt();
+        if (value > 0) return value;
+        continue;
+      }
+      if (candidate is String) {
+        final value = int.tryParse(candidate.trim());
+        if (value != null && value > 0) {
+          return value;
+        }
+        continue;
+      }
+      if (candidate is Map) {
+        final map = candidate.cast<String, dynamic>();
+        final nestedCandidates = <dynamic>[
+          map['id'],
+          map['posjed_veza_id'],
+          map['posjed_id'],
+        ];
+        for (final nested in nestedCandidates) {
+          if (nested is num && nested.toInt() > 0) {
+            return nested.toInt();
+          }
+          if (nested is String) {
+            final value = int.tryParse(nested.trim());
+            if (value != null && value > 0) {
+              return value;
+            }
+          }
+        }
+      }
+    }
+
+    return 0;
   }
 
   static String _normalizeUzrastValue(String raw) {
@@ -381,7 +426,9 @@ class Cattle {
     if (potomciRaw is List) {
       for (final item in potomciRaw) {
         if (item is Map) {
-          descendants.add(CattleDescendant.fromApi(item.cast<String, dynamic>()));
+          descendants.add(
+            CattleDescendant.fromApi(item.cast<String, dynamic>()),
+          );
           continue;
         }
 
@@ -421,6 +468,7 @@ class Cattle {
       pasmina: _extractText(govedo['pasmina']),
       datumTelenja: govedo['datum_telenja']?.toString() ?? '',
       posjed: _extractPosjed(govedo, apiEntry),
+      posjedVezaId: _extractPosjedVezaId(govedo, apiEntry),
       uzrast: _extractUzrastFromBackend(govedo, apiEntry),
       majka: _extractText(govedo['majka']),
       otac: _extractText(govedo['otac']),

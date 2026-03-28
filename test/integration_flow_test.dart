@@ -7,6 +7,7 @@ import 'package:dalekopro_farma_flutter/core/storage/token_storage.dart';
 import 'package:dalekopro_farma_flutter/features/auth/data/auth_repository.dart';
 import 'package:dalekopro_farma_flutter/features/auth/presentation/login_screen.dart';
 import 'package:dalekopro_farma_flutter/features/cattle/data/cattle_repository.dart';
+import 'package:dalekopro_farma_flutter/features/cattle_transfer/data/cattle_transfer_repository.dart';
 import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
@@ -25,9 +26,7 @@ void main() {
     clearMockSecureStorage();
   });
 
-  testWidgets('full flow login -> dashboard -> upload screen', (
-    tester,
-  ) async {
+  testWidgets('full flow login -> dashboard -> upload screen', (tester) async {
     final tokenStorage = const TokenStorage();
     final client = ApiClient(tokenStorage: tokenStorage);
 
@@ -110,6 +109,7 @@ void main() {
     );
     final farmsRepository = FarmsRepository(client: client);
     final cattleRepository = CattleRepository(client: client);
+    final cattleTransferRepository = CattleTransferRepository(client: client);
     final uploadRepository = UploadRepository(client: client);
 
     await tester.pumpWidget(
@@ -117,6 +117,7 @@ void main() {
         authRepository: authRepository,
         farmsRepository: farmsRepository,
         cattleRepository: cattleRepository,
+        cattleTransferRepository: cattleTransferRepository,
         uploadRepository: uploadRepository,
       ),
     );
@@ -184,12 +185,14 @@ class _FlowTestApp extends StatefulWidget {
     required this.authRepository,
     required this.farmsRepository,
     required this.cattleRepository,
+    required this.cattleTransferRepository,
     required this.uploadRepository,
   });
 
   final AuthRepository authRepository;
   final FarmsRepository farmsRepository;
   final CattleRepository cattleRepository;
+  final CattleTransferRepository cattleTransferRepository;
   final UploadRepository uploadRepository;
 
   @override
@@ -210,6 +213,7 @@ class _FlowTestAppState extends State<_FlowTestApp> {
           : DashboardScreen(
               farmsRepository: widget.farmsRepository,
               cattleRepository: widget.cattleRepository,
+              cattleTransferRepository: widget.cattleTransferRepository,
               uploadRepository: widget.uploadRepository,
               onLogout: () async => setState(() => _token = null),
             ),
