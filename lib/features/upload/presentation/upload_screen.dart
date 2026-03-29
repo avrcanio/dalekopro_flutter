@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:exif/exif.dart';
@@ -67,6 +68,7 @@ class _UploadScreenState extends State<UploadScreen> {
   String? _selectedImageSourceDocumentUri;
   String? _selectedImageSourceName;
   double? _uploadProgressPercent;
+  bool _loadingSafImages = false;
 
   @override
   void initState() {
@@ -146,6 +148,9 @@ class _UploadScreenState extends State<UploadScreen> {
     setState(() {
       _folderUri = uri;
     });
+    if (uri != null && uri.isNotEmpty) {
+      unawaited(_safBridge.prefetchTreeContents(treeUri: uri));
+    }
   }
 
   Future<void> _selectFolder() async {
@@ -163,6 +168,7 @@ class _UploadScreenState extends State<UploadScreen> {
       setState(() {
         _folderUri = uri;
       });
+      unawaited(_safBridge.prefetchTreeContents(treeUri: uri));
       _setMessage('SAF folder je uspjesno postavljen.', StatusType.success);
     } on PlatformException {
       _setMessage(
@@ -183,7 +189,11 @@ class _UploadScreenState extends State<UploadScreen> {
         return;
       }
       _clearSelectedImageSource();
-      await _cropAndSet(File(xFile.path));
+      final cropped = await _cropAndSet(File(xFile.path));
+      if (!cropped) {
+        _clearSelectedImageSource();
+        _setMessage('Crop je otkazan.', StatusType.info);
+      }
     } on PlatformException {
       _setMessage('Kamera nije dostupna ili nema dozvolu.', StatusType.error);
     }
@@ -195,41 +205,59 @@ class _UploadScreenState extends State<UploadScreen> {
       return;
     }
 
+    setState(() {
+      _loadingSafImages = true;
+    });
+
     try {
-      final images = await _safBridge.listImagesFromTree(treeUri: _folderUri!);
-      if (!mounted) return;
-      if (images.isEmpty) {
-        _setMessage('U odabranom SAF folderu nema dostupnih slika.', StatusType.info);
-        return;
-      }
+      while (mounted) {
+        final images =
+            _safBridge.getCachedImagesForTree(treeUri: _folderUri!) ??
+            await _safBridge.listImagesFromTree(treeUri: _folderUri!);
+        if (!mounted) return;
+        if (images.isEmpty) {
+          _setMessage('U odabranom SAF folderu nema dostupnih slika.', StatusType.info);
+          return;
+        }
 
-      final selected = await Navigator.of(context).push<SafImageEntry>(
-        MaterialPageRoute(
-          builder: (_) => SafImagePickerScreen(images: images, safBridge: _safBridge),
-        ),
-      );
-      if (!mounted) return;
-      if (selected == null) {
-        _setMessage('Odabir slike iz foldera je otkazan.', StatusType.info);
-        return;
-      }
+        final selected = await Navigator.of(context).push<SafImageEntry>(
+          MaterialPageRoute(
+            builder: (_) => SafImagePickerScreen(images: images, safBridge: _safBridge),
+          ),
+        );
+        if (!mounted) return;
+        if (selected == null) {
+          _setMessage('Odabir slike iz foldera je otkazan.', StatusType.info);
+          return;
+        }
 
-      final filePath = await _safBridge.copyDocumentToCache(
-        documentUri: selected.uri,
-        suggestedFileName: selected.displayName,
-      );
-      if (filePath == null || filePath.isEmpty) {
-        _setMessage('Odabir slike iz foldera je otkazan.', StatusType.info);
-        return;
+        final filePath = await _safBridge.copyDocumentToCache(
+          documentUri: selected.uri,
+          suggestedFileName: selected.displayName,
+        );
+        if (filePath == null || filePath.isEmpty) {
+          _setMessage('Odabir slike iz foldera je otkazan.', StatusType.info);
+          return;
+        }
+        _selectedImageSourceDocumentUri = selected.uri;
+        _selectedImageSourceName = selected.displayName;
+        final cropped = await _cropAndSet(File(filePath));
+        if (!mounted) return;
+        if (cropped) {
+          return;
+        }
       }
-      _selectedImageSourceDocumentUri = selected.uri;
-      _selectedImageSourceName = selected.displayName;
-      await _cropAndSet(File(filePath));
     } on PlatformException {
       _setMessage(
         'Nije moguce procitati sliku iz odabranog foldera.',
         StatusType.error,
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingSafImages = false;
+        });
+      }
     }
   }
 
@@ -342,7 +370,7 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
-  Future<void> _cropAndSet(File file) async {
+  Future<bool> _cropAndSet(File file) async {
     try {
       final overriddenCrop = widget.cropImageOverride;
       final File? croppedFile;
@@ -372,11 +400,9 @@ class _UploadScreenState extends State<UploadScreen> {
       }
 
       if (croppedFile == null) {
-        _clearSelectedImageSource();
-        _setMessage('Crop je otkazan.', StatusType.info);
-        return;
+        return false;
       }
-      if (!mounted) return;
+      if (!mounted) return false;
       final uploadFile = croppedFile;
       await _extractExifFromImage(sourceFile: file, uploadFile: uploadFile);
 
@@ -393,8 +419,10 @@ class _UploadScreenState extends State<UploadScreen> {
           StatusType.warning,
         );
       }
+      return true;
     } on PlatformException {
       _setMessage('Obrada slike nije uspjela.', StatusType.error);
+      return false;
     }
   }
 
@@ -497,6 +525,7 @@ class _UploadScreenState extends State<UploadScreen> {
           _resetSelectedCattle();
         });
         if (deleted) {
+          _safBridge.removeDocumentFromCache(documentUri: sourceUri);
           _setMessage(
             '$successPrefix. Originalna slika je obrisana.',
             StatusType.success,
@@ -577,6 +606,7 @@ class _UploadScreenState extends State<UploadScreen> {
   @override
   Widget build(BuildContext context) {
     final hasFolder = _folderUri != null && _folderUri!.isNotEmpty;
+    final disableImageActions = _uploading || _loadingSafImages;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Upload slike goveda')),
@@ -705,14 +735,30 @@ class _UploadScreenState extends State<UploadScreen> {
               runSpacing: 12,
               children: [
                 FilledButton.icon(
-                  onPressed: _uploading ? null : _pickFromCamera,
+                  onPressed: disableImageActions ? null : _pickFromCamera,
                   icon: const Icon(Icons.photo_camera),
                   label: const Text('Slikaj'),
                 ),
-                OutlinedButton.icon(
-                  onPressed: _uploading ? null : _pickFromSelectedFolder,
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('Iz SAF foldera'),
+                OutlinedButton(
+                  onPressed: disableImageActions ? null : _pickFromSelectedFolder,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_loadingSafImages) ...[
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Ucitavanje...'),
+                      ] else ...[
+                        const Icon(Icons.folder_open),
+                        const SizedBox(width: 8),
+                        const Text('Iz SAF foldera'),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),

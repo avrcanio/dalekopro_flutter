@@ -7,10 +7,12 @@ import 'package:dalekopro_farma_flutter/core/storage/saf_bridge.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  const bridge = SafBridge();
 
   const channel = MethodChannel('dalekopro/saf');
 
   setUp(() {
+    bridge.clearSessionCache();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           switch (call.method) {
@@ -46,13 +48,12 @@ void main() {
   });
 
   tearDown(() {
+    bridge.clearSessionCache();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
   });
 
   test('SafBridge maps listImagesFromTree response', () async {
-    const bridge = SafBridge();
-
     final images = await bridge.listImagesFromTree(treeUri: 'content://tree/1');
 
     expect(images, hasLength(2));
@@ -63,8 +64,6 @@ void main() {
   });
 
   test('SafBridge maps copyDocumentToCache response', () async {
-    const bridge = SafBridge();
-
     final path = await bridge.copyDocumentToCache(
       documentUri: 'content://images/2',
       suggestedFileName: 'newest.jpg',
@@ -74,8 +73,6 @@ void main() {
   });
 
   test('SafBridge maps loadDocumentThumbnail response', () async {
-    const bridge = SafBridge();
-
     final bytes = await bridge.loadDocumentThumbnail(
       documentUri: 'content://images/2',
     );
@@ -85,12 +82,29 @@ void main() {
   });
 
   test('SafBridge maps deleteDocument response', () async {
-    const bridge = SafBridge();
-
     final deleted = await bridge.deleteDocument(
       documentUri: 'content://images/2',
     );
 
     expect(deleted, isTrue);
+  });
+
+  test('SafBridge caches image lists and thumbnails in memory', () async {
+    final images = await bridge.listImagesFromTree(treeUri: 'content://tree/1');
+    final cachedImages = bridge.getCachedImagesForTree(treeUri: 'content://tree/1');
+
+    expect(cachedImages, isNotNull);
+    expect(cachedImages, hasLength(images.length));
+
+    final bytes = await bridge.loadDocumentThumbnail(
+      documentUri: 'content://images/2',
+    );
+    final cachedBytes = bridge.getCachedThumbnail(
+      documentUri: 'content://images/2',
+    );
+
+    expect(bytes, isNotNull);
+    expect(cachedBytes, isNotNull);
+    expect(cachedBytes, orderedEquals(const <int>[1, 2, 3, 4]));
   });
 }

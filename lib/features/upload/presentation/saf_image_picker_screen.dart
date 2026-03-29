@@ -1,24 +1,25 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/storage/saf_bridge.dart';
 import '../../../core/widgets/status_widgets.dart';
 
-class SafImagePickerScreen extends StatelessWidget {
-  SafImagePickerScreen({
+class SafImagePickerScreen extends StatefulWidget {
+  const SafImagePickerScreen({
     super.key,
-    required List<SafImageEntry> images,
+    required this.images,
     this.safBridge,
-  }) : sections = _buildSections(images);
+  });
 
-  final List<_SafImageSection> sections;
+  final List<SafImageEntry> images;
   final SafBridge? safBridge;
 
-  static final DateFormat _sectionDateFormat = DateFormat('dd.MM.yyyy');
+  static final DateFormat sectionDateFormat = DateFormat('dd.MM.yyyy');
 
-  static List<SafImageEntry> _sortImages(List<SafImageEntry> images) {
+  static List<SafImageEntry> sortImages(List<SafImageEntry> images) {
     final sorted = List<SafImageEntry>.of(images);
     sorted.sort((a, b) {
       final aModified = a.lastModifiedMillis;
@@ -36,8 +37,8 @@ class SafImagePickerScreen extends StatelessWidget {
     return sorted;
   }
 
-  static List<_SafImageSection> _buildSections(List<SafImageEntry> images) {
-    final sorted = _sortImages(images);
+  static List<SafImageSection> buildSections(List<SafImageEntry> images) {
+    final sorted = sortImages(images);
     final sectionsByKey = <String, List<SafImageEntry>>{};
     final labels = <String, String>{};
     final order = <String>[];
@@ -49,7 +50,7 @@ class SafImagePickerScreen extends StatelessWidget {
           : DateTime.fromMillisecondsSinceEpoch(millis).toIso8601String().split('T').first;
       final label = millis == null || millis <= 0
           ? 'Nepoznat datum'
-          : _sectionDateFormat.format(DateTime.fromMillisecondsSinceEpoch(millis));
+          : sectionDateFormat.format(DateTime.fromMillisecondsSinceEpoch(millis));
 
       if (!sectionsByKey.containsKey(key)) {
         sectionsByKey[key] = <SafImageEntry>[];
@@ -61,7 +62,7 @@ class SafImagePickerScreen extends StatelessWidget {
 
     return order
         .map(
-          (key) => _SafImageSection(
+          (key) => SafImageSection(
             title: labels[key]!,
             items: List<SafImageEntry>.unmodifiable(sectionsByKey[key]!),
           ),
@@ -70,14 +71,123 @@ class SafImagePickerScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final bridge = safBridge ?? const SafBridge();
+  State<SafImagePickerScreen> createState() => _SafImagePickerScreenState();
+}
 
+class _SafImagePickerScreenState extends State<SafImagePickerScreen> {
+  late final SafBridge _bridge;
+  late List<SafImageEntry> _images;
+  bool _deletingImage = false;
+  String? _message;
+  StatusType _messageType = StatusType.info;
+
+  List<SafImageSection> get sections => SafImagePickerScreen.buildSections(_images);
+
+  @override
+  void initState() {
+    super.initState();
+    _bridge = widget.safBridge ?? const SafBridge();
+    _images = List<SafImageEntry>.of(widget.images);
+  }
+
+  void _setMessage(String message, StatusType type) {
+    if (!mounted) return;
+    setState(() {
+      _message = message;
+      _messageType = type;
+    });
+  }
+
+  Future<void> _showImageOptions(SafImageEntry item) async {
+    if (_deletingImage) return;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Delete'),
+                onTap: () => Navigator.of(context).pop('delete'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.of(context).pop('cancel'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action != 'delete') {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Obrisati sliku?'),
+          content: const Text('Slika ce biti obrisana s telefona.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _deletingImage = true;
+      _message = null;
+    });
+
+    try {
+      final deleted = await _bridge.deleteDocument(documentUri: item.uri);
+      if (!mounted) return;
+
+      if (deleted) {
+        _bridge.removeDocumentFromCache(documentUri: item.uri);
+        setState(() {
+          _images = _images.where((image) => image.uri != item.uri).toList();
+        });
+        _setMessage('Slika je obrisana s telefona.', StatusType.success);
+      } else {
+        _setMessage('Sliku nije moguce obrisati.', StatusType.warning);
+      }
+    } on PlatformException {
+      _setMessage('Sliku nije moguce obrisati.', StatusType.error);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deletingImage = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Odabir slike iz SAF foldera')),
       body: SafeArea(
         top: false,
-        child: sections.isEmpty
+        child: _images.isEmpty
             ? const FullScreenState(
                 message: 'U odabranom SAF folderu nema dostupnih slika.',
                 icon: Icons.photo_library_outlined,
@@ -91,6 +201,14 @@ class SafImagePickerScreen extends StatelessWidget {
                       type: StatusType.info,
                     ),
                   ),
+                  if (_message != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: InlineStatusMessage(
+                        message: _message!,
+                        type: _messageType,
+                      ),
+                    ),
                   Expanded(
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -127,8 +245,10 @@ class SafImagePickerScreen extends StatelessWidget {
                                   return _SafImageTile(
                                     key: ValueKey('saf-image-${item.uri}'),
                                     item: item,
-                                    bridge: bridge,
+                                    bridge: _bridge,
+                                    deleting: _deletingImage,
                                     onTap: () => Navigator.of(context).pop(item),
+                                    onLongPress: () => _showImageOptions(item),
                                   );
                                 },
                               ),
@@ -145,8 +265,8 @@ class SafImagePickerScreen extends StatelessWidget {
   }
 }
 
-class _SafImageSection {
-  const _SafImageSection({
+class SafImageSection {
+  const SafImageSection({
     required this.title,
     required this.items,
   });
@@ -161,48 +281,86 @@ class _SafImageTile extends StatelessWidget {
     required this.item,
     required this.bridge,
     required this.onTap,
+    required this.onLongPress,
+    required this.deleting,
   });
 
   final SafImageEntry item;
   final SafBridge bridge;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
+  final bool deleting;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cachedBytes = bridge.getCachedThumbnail(documentUri: item.uri);
 
     return Card(
       clipBehavior: Clip.antiAlias,
       elevation: 1,
       child: InkWell(
-        onTap: onTap,
-        child: ColoredBox(
-          color: theme.colorScheme.surfaceContainerHighest,
-          child: FutureBuilder<Uint8List?>(
-            future: bridge.loadDocumentThumbnail(documentUri: item.uri),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const Center(
-                  child: SizedBox(
-                    width: 26,
-                    height: 26,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+        onTap: deleting ? null : onTap,
+        onLongPress: deleting ? null : onLongPress,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(
+              color: theme.colorScheme.surfaceContainerHighest,
+              child: cachedBytes != null && cachedBytes.isNotEmpty
+                  ? Image.memory(
+                      cachedBytes,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const _SafThumbnailPlaceholder(),
+                    )
+                  : FutureBuilder<Uint8List?>(
+                      future: bridge.loadDocumentThumbnail(documentUri: item.uri),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState != ConnectionState.done) {
+                          return const Center(
+                            child: SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        }
+
+                        final bytes = snapshot.data;
+                        if (bytes == null || bytes.isEmpty) {
+                          return const _SafThumbnailPlaceholder();
+                        }
+
+                        return Image.memory(
+                          bytes,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const _SafThumbnailPlaceholder(),
+                        );
+                      },
+                    ),
+            ),
+            if (deleting)
+              ColoredBox(
+                color: Colors.black26,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black45,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
-                );
-              }
-
-              final bytes = snapshot.data;
-              if (bytes == null || bytes.isEmpty) {
-                return const _SafThumbnailPlaceholder();
-              }
-
-              return Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const _SafThumbnailPlaceholder(),
-              );
-            },
-          ),
+                ),
+              ),
+          ],
         ),
       ),
     );

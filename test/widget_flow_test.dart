@@ -43,6 +43,7 @@ void main() {
     setupMockGeolocator();
   });
   tearDown(() {
+    const SafBridge().clearSessionCache();
     clearMockGeolocator();
     clearMockSecureStorage();
   });
@@ -396,6 +397,7 @@ void main() {
       findsOneWidget,
     );
     expect(bridge.selectTreeInitialUris, <String?>[null]);
+    expect(bridge.listImagesCallCount, 1);
 
     final client = ApiClient(tokenStorage: storage);
     final uploadRepo = UploadRepository(client: client);
@@ -429,6 +431,165 @@ void main() {
     expect(find.text('SAF folder URI'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, 'Odaberi'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, 'Iz SAF foldera'), findsOneWidget);
+  });
+
+  testWidgets('Iz SAF foldera button shows loading state and reuses cache', (
+    tester,
+  ) async {
+    final storage = const TokenStorage();
+    await storage.saveFolderUri('content://tree/cached');
+    final client = ApiClient(tokenStorage: storage);
+    final bridge = _FakeSafBridge(
+      images: const <SafImageEntry>[
+        SafImageEntry(
+          uri: 'content://images/1',
+          displayName: 'one.jpg',
+          mimeType: 'image/jpeg',
+          lastModifiedMillis: 1000,
+        ),
+      ],
+      copiedFilePath: '',
+      listDelay: const Duration(milliseconds: 100),
+    );
+    final cattle = [
+      Cattle(
+        id: 1,
+        zivotniBroj: 'HR123',
+        ime: 'Mila',
+        spol: 'Z',
+        datumTelenja: '2020-05-01',
+        uzrast: '',
+        majka: '',
+        otac: '',
+        imageUrl: '',
+        potomci: const [],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UploadScreen(
+          cattle: cattle,
+          repository: UploadRepository(client: client),
+          storage: storage,
+          safBridge: bridge,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Iz SAF foldera'));
+    await tester.pump();
+
+    expect(find.text('Ucitavanje...'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Odabir slike iz SAF foldera'), findsOneWidget);
+    expect(bridge.listImagesCallCount, 1);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Iz SAF foldera'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Odabir slike iz SAF foldera'), findsOneWidget);
+    expect(bridge.listImagesCallCount, 1);
+  });
+
+  testWidgets('SAF crop cancel returns user to picker for another selection', (
+    tester,
+  ) async {
+    final storage = const TokenStorage();
+    await storage.saveFolderUri('content://tree/retry');
+    final client = ApiClient(tokenStorage: storage);
+    final firstFile = File('${Directory.systemTemp.path}/saf_retry_first.jpg');
+    firstFile.writeAsBytesSync(_tinyPngBytes);
+    final secondFile = File('${Directory.systemTemp.path}/saf_retry_second.jpg');
+    secondFile.writeAsBytesSync(_tinyPngBytes);
+    final cattle = [
+      Cattle(
+        id: 1,
+        zivotniBroj: 'HR123',
+        ime: 'Mila',
+        spol: 'Z',
+        datumTelenja: '2020-05-01',
+        uzrast: '',
+        majka: '',
+        otac: '',
+        imageUrl: '',
+        potomci: const [],
+      ),
+    ];
+    final bridge = _FakeSafBridge(
+      images: const <SafImageEntry>[
+        SafImageEntry(
+          uri: 'content://images/first',
+          displayName: 'first.jpg',
+          mimeType: 'image/jpeg',
+          lastModifiedMillis: 2000,
+        ),
+        SafImageEntry(
+          uri: 'content://images/second',
+          displayName: 'second.jpg',
+          mimeType: 'image/jpeg',
+          lastModifiedMillis: 1000,
+        ),
+      ],
+      copiedFilePath: '',
+      copiedFilePathsByUri: <String, String>{
+        'content://images/first': firstFile.path,
+        'content://images/second': secondFile.path,
+      },
+    );
+
+    var cropCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UploadScreen(
+          cattle: cattle,
+          repository: UploadRepository(client: client),
+          storage: storage,
+          safBridge: bridge,
+          cropImageOverride: (sourceFile) async {
+            cropCalls++;
+            if (cropCalls == 1) {
+              return null;
+            }
+            return secondFile;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Iz SAF foldera'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Odabir slike iz SAF foldera'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('saf-image-content://images/first')).hitTestable().first,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Odabir slike iz SAF foldera'), findsWidgets);
+    expect(find.byKey(const ValueKey('saf-image-content://images/second')), findsWidgets);
+    expect(find.text('Crop je otkazan.'), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('saf-image-content://images/second')).hitTestable().first,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Upload slike goveda'), findsOneWidget);
+    expect(cropCalls, 2);
   });
 
   testWidgets('SAF upload offers delete dialog and keeps original on user choice', (
@@ -530,6 +691,21 @@ void main() {
       copiedFilePath: sourceFile.path,
       deleteResult: true,
     );
+    bridge.cacheImagesForTree(
+      treeUri: 'content://tree/upload-delete',
+      images: const <SafImageEntry>[
+        SafImageEntry(
+          uri: 'content://images/delete',
+          displayName: 'delete.jpg',
+          mimeType: 'image/jpeg',
+          lastModifiedMillis: 1000,
+        ),
+      ],
+    );
+    bridge.cacheThumbnail(
+      documentUri: 'content://images/delete',
+      bytes: Uint8List.fromList(const <int>[1, 2, 3]),
+    );
 
     await tester.pumpWidget(
       MaterialApp(
@@ -565,6 +741,14 @@ void main() {
     expect(find.widgetWithText(TextFormField, ''), findsOneWidget);
     expect(find.text('Odaberi govedo iz rezultata pretrage.'), findsOneWidget);
     expect(bridge.deletedUris, contains('content://images/delete'));
+    expect(
+      bridge.getCachedImagesForTree(treeUri: 'content://tree/upload-delete'),
+      isEmpty,
+    );
+    expect(
+      bridge.getCachedThumbnail(documentUri: 'content://images/delete'),
+      isNull,
+    );
   });
 
   testWidgets('camera upload does not offer delete dialog', (tester) async {
@@ -850,16 +1034,22 @@ class _FakeSafBridge extends SafBridge {
   _FakeSafBridge({
     required this.images,
     required this.copiedFilePath,
+    this.copiedFilePathsByUri = const <String, String>{},
     this.deleteResult = false,
     this.selectedTreeUri,
+    this.listDelay = Duration.zero,
   });
 
   final List<SafImageEntry> images;
   final String copiedFilePath;
+  final Map<String, String> copiedFilePathsByUri;
   final bool deleteResult;
   final String? selectedTreeUri;
+  final Duration listDelay;
   final List<String> deletedUris = <String>[];
   final List<String?> selectTreeInitialUris = <String?>[];
+  int listImagesCallCount = 0;
+  int thumbnailLoadCount = 0;
 
   @override
   Future<String?> selectDocumentTree({String? initialTreeUri}) async {
@@ -870,13 +1060,20 @@ class _FakeSafBridge extends SafBridge {
   @override
   Future<List<SafImageEntry>> listImagesFromTree({
     required String treeUri,
-  }) async => images;
+  }) async {
+    listImagesCallCount++;
+    if (listDelay > Duration.zero) {
+      await Future<void>.delayed(listDelay);
+    }
+    cacheImagesForTree(treeUri: treeUri, images: images);
+    return images;
+  }
 
   @override
   Future<String?> copyDocumentToCache({
     required String documentUri,
     String? suggestedFileName,
-  }) async => copiedFilePath;
+  }) async => copiedFilePathsByUri[documentUri] ?? copiedFilePath;
 
   @override
   Future<bool> deleteDocument({required String documentUri}) async {
@@ -889,7 +1086,10 @@ class _FakeSafBridge extends SafBridge {
     required String documentUri,
     int width = 512,
     int height = 512,
-  }) async => null;
+  }) async {
+    thumbnailLoadCount++;
+    return null;
+  }
 }
 
 class _FakeUploadRepository extends UploadRepository {

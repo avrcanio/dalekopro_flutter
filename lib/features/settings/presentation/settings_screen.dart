@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -75,6 +77,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _folderUri = uri;
       });
+      unawaited(_safBridge.prefetchTreeContents(treeUri: uri));
       _setMessage('SAF folder je uspjesno spremljen.', StatusType.success);
     } on PlatformException {
       _setMessage(
