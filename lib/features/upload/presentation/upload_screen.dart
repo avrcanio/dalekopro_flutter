@@ -13,6 +13,7 @@ import '../../../core/widgets/screen_insets.dart';
 import '../../../core/widgets/status_widgets.dart';
 import '../../cattle/models/cattle.dart';
 import '../data/upload_repository.dart';
+import 'saf_image_picker_screen.dart';
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({
@@ -23,6 +24,10 @@ class UploadScreen extends StatefulWidget {
     this.safBridge,
     this.imagePicker,
     this.initialImageForTest,
+    this.cropImageOverride,
+    this.initialSelectedImageSourceDocumentUri,
+    this.initialSelectedImageSourceName,
+    this.initialSelectedCattleForTest,
   });
 
   final List<Cattle> cattle;
@@ -31,6 +36,10 @@ class UploadScreen extends StatefulWidget {
   final SafBridge? safBridge;
   final ImagePicker? imagePicker;
   final File? initialImageForTest;
+  final Future<File?> Function(File sourceFile)? cropImageOverride;
+  final String? initialSelectedImageSourceDocumentUri;
+  final String? initialSelectedImageSourceName;
+  final Cattle? initialSelectedCattleForTest;
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
@@ -55,6 +64,9 @@ class _UploadScreenState extends State<UploadScreen> {
   String? _exifDate;
   double? _exifLatitude;
   double? _exifLongitude;
+  String? _selectedImageSourceDocumentUri;
+  String? _selectedImageSourceName;
+  double? _uploadProgressPercent;
 
   @override
   void initState() {
@@ -65,11 +77,13 @@ class _UploadScreenState extends State<UploadScreen> {
     _cattleSearchController = TextEditingController();
     _cattleSearchFocusNode = FocusNode();
 
-    if (widget.cattle.isNotEmpty) {
-      _selectedCattle = widget.cattle.first;
+    _selectedImage = widget.initialImageForTest;
+    _selectedImageSourceDocumentUri = widget.initialSelectedImageSourceDocumentUri;
+    _selectedImageSourceName = widget.initialSelectedImageSourceName;
+    _selectedCattle = widget.initialSelectedCattleForTest;
+    if (_selectedCattle != null) {
       _cattleSearchController.text = _cattleOptionLabel(_selectedCattle!);
     }
-    _selectedImage = widget.initialImageForTest;
     _loadFolderUri();
   }
 
@@ -168,6 +182,7 @@ class _UploadScreenState extends State<UploadScreen> {
         _setMessage('Slikanje je otkazano.', StatusType.info);
         return;
       }
+      _clearSelectedImageSource();
       await _cropAndSet(File(xFile.path));
     } on PlatformException {
       _setMessage('Kamera nije dostupna ili nema dozvolu.', StatusType.error);
@@ -181,11 +196,34 @@ class _UploadScreenState extends State<UploadScreen> {
     }
 
     try {
-      final filePath = await _safBridge.pickImageFromTree(treeUri: _folderUri!);
+      final images = await _safBridge.listImagesFromTree(treeUri: _folderUri!);
+      if (!mounted) return;
+      if (images.isEmpty) {
+        _setMessage('U odabranom SAF folderu nema dostupnih slika.', StatusType.info);
+        return;
+      }
+
+      final selected = await Navigator.of(context).push<SafImageEntry>(
+        MaterialPageRoute(
+          builder: (_) => SafImagePickerScreen(images: images, safBridge: _safBridge),
+        ),
+      );
+      if (!mounted) return;
+      if (selected == null) {
+        _setMessage('Odabir slike iz foldera je otkazan.', StatusType.info);
+        return;
+      }
+
+      final filePath = await _safBridge.copyDocumentToCache(
+        documentUri: selected.uri,
+        suggestedFileName: selected.displayName,
+      );
       if (filePath == null || filePath.isEmpty) {
         _setMessage('Odabir slike iz foldera je otkazan.', StatusType.info);
         return;
       }
+      _selectedImageSourceDocumentUri = selected.uri;
+      _selectedImageSourceName = selected.displayName;
       await _cropAndSet(File(filePath));
     } on PlatformException {
       _setMessage(
@@ -306,32 +344,40 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _cropAndSet(File file) async {
     try {
-      final cropped = await _cropper.cropImage(
-        sourcePath: file.path,
-        // Keep the crop frame fixed to a portrait 9:16 ratio.
-        // Users can still resize it, but only proportionally.
-        aspectRatio: const CropAspectRatio(ratioX: 9, ratioY: 16),
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Uredi sliku',
-            toolbarColor: Colors.white,
-            toolbarWidgetColor: Colors.black,
-            backgroundColor: Colors.black,
-            statusBarLight: true,
-            // uCrop bottom controls can sit under Android 3-button navigation.
-            // Hide them so the crop screen stays usable across devices.
-            hideBottomControls: true,
-            lockAspectRatio: true,
-          ),
-        ],
-      );
+      final overriddenCrop = widget.cropImageOverride;
+      final File? croppedFile;
+      if (overriddenCrop != null) {
+        croppedFile = await overriddenCrop(file);
+      } else {
+        final cropped = await _cropper.cropImage(
+          sourcePath: file.path,
+          // Keep the crop frame fixed to a portrait 9:16 ratio.
+          // Users can still resize it, but only proportionally.
+          aspectRatio: const CropAspectRatio(ratioX: 9, ratioY: 16),
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: 'Uredi sliku',
+              toolbarColor: Colors.white,
+              toolbarWidgetColor: Colors.black,
+              backgroundColor: Colors.black,
+              statusBarLight: true,
+              // uCrop bottom controls can sit under Android 3-button navigation.
+              // Hide them so the crop screen stays usable across devices.
+              hideBottomControls: true,
+              lockAspectRatio: true,
+            ),
+          ],
+        );
+        croppedFile = cropped == null ? null : File(cropped.path);
+      }
 
-      if (cropped == null) {
+      if (croppedFile == null) {
+        _clearSelectedImageSource();
         _setMessage('Crop je otkazan.', StatusType.info);
         return;
       }
       if (!mounted) return;
-      final uploadFile = File(cropped.path);
+      final uploadFile = croppedFile;
       await _extractExifFromImage(sourceFile: file, uploadFile: uploadFile);
 
       setState(() {
@@ -374,6 +420,116 @@ class _UploadScreenState extends State<UploadScreen> {
     return true;
   }
 
+  void _clearSelectedImageSource() {
+    _selectedImageSourceDocumentUri = null;
+    _selectedImageSourceName = null;
+  }
+
+  void _resetSelectedCattle() {
+    _selectedCattle = null;
+    _cattleSearchController.clear();
+  }
+
+  String _uploadButtonLabel() {
+    if (!_uploading) {
+      return 'Upload';
+    }
+    final progress = _uploadProgressPercent;
+    if (progress == null) {
+      return 'Saljem...';
+    }
+    return 'Upload ${progress.round()}%';
+  }
+
+  Future<bool?> _showDeleteOriginalDialog() {
+    final name = _selectedImageSourceName;
+    final suffix = name == null || name.trim().isEmpty ? '' : '\n\n$name';
+
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Obrisati originalnu sliku?'),
+          content: Text(
+            'Upload je uspjesno zavrsen. Zelite li obrisati originalnu sliku iz SAF foldera / telefona?$suffix',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Zadrzi'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Obrisi'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _handlePostUploadSuccess(UploadResult result) async {
+    final sourceUri = _selectedImageSourceDocumentUri;
+    final successPrefix =
+        'Upload uspjesan: status=${result.status}, slika_id=${result.slikaId ?? '-'}';
+
+    if (sourceUri == null || sourceUri.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _selectedImage = null;
+        _clearSelectedImageSource();
+        _resetSelectedCattle();
+      });
+      _setMessage(successPrefix, StatusType.success);
+      return;
+    }
+
+    final shouldDelete = await _showDeleteOriginalDialog();
+    if (!mounted) return;
+
+    if (shouldDelete == true) {
+      try {
+        final deleted = await _safBridge.deleteDocument(documentUri: sourceUri);
+        if (!mounted) return;
+        setState(() {
+          _selectedImage = null;
+          _clearSelectedImageSource();
+          _resetSelectedCattle();
+        });
+        if (deleted) {
+          _setMessage(
+            '$successPrefix. Originalna slika je obrisana.',
+            StatusType.success,
+          );
+        } else {
+          _setMessage(
+            '$successPrefix. Originalna slika nije obrisana.',
+            StatusType.warning,
+          );
+        }
+      } on PlatformException {
+        if (!mounted) return;
+        setState(() {
+          _selectedImage = null;
+          _clearSelectedImageSource();
+          _resetSelectedCattle();
+        });
+        _setMessage(
+          '$successPrefix. Originalna slika nije obrisana.',
+          StatusType.warning,
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _selectedImage = null;
+      _clearSelectedImageSource();
+      _resetSelectedCattle();
+    });
+    _setMessage('$successPrefix. Originalna slika je zadrzana.', StatusType.success);
+  }
+
   Future<void> _upload() async {
     if (_uploading) return;
     if (!_validateBeforeUpload()) return;
@@ -381,6 +537,7 @@ class _UploadScreenState extends State<UploadScreen> {
     setState(() {
       _uploading = true;
       _message = null;
+      _uploadProgressPercent = null;
     });
 
     try {
@@ -390,16 +547,18 @@ class _UploadScreenState extends State<UploadScreen> {
         datum: _exifDate,
         latitude: _exifLatitude,
         longitude: _exifLongitude,
+        onSendProgress: (sent, total) {
+          if (!mounted) return;
+          setState(() {
+            _uploadProgressPercent = total > 0
+                ? (sent / total * 100).clamp(0, 100).toDouble()
+                : null;
+          });
+        },
       );
 
       if (!mounted) return;
-      setState(() {
-        _selectedImage = null;
-      });
-      _setMessage(
-        'Upload uspjesan: status=${result.status}, slika_id=${result.slikaId ?? '-'}',
-        StatusType.success,
-      );
+      await _handlePostUploadSuccess(result);
     } catch (e) {
       _setMessage(
         e.toString().replaceFirst('Exception: ', ''),
@@ -409,6 +568,7 @@ class _UploadScreenState extends State<UploadScreen> {
       if (mounted) {
         setState(() {
           _uploading = false;
+          _uploadProgressPercent = null;
         });
       }
     }
@@ -416,6 +576,8 @@ class _UploadScreenState extends State<UploadScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasFolder = _folderUri != null && _folderUri!.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Upload slike goveda')),
       body: SafeArea(
@@ -441,6 +603,8 @@ class _UploadScreenState extends State<UploadScreen> {
                   _selectedCattle = value;
                 });
                 _cattleSearchController.text = _cattleOptionLabel(value);
+                _cattleSearchFocusNode.unfocus();
+                FocusScope.of(context).unfocus();
               },
               fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
                 return TextFormField(
@@ -525,15 +689,17 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            ListTile(
-              title: const Text('SAF folder URI'),
-              subtitle: Text(_folderUri ?? 'Nije odabran folder'),
-              trailing: OutlinedButton(
-                onPressed: _uploading ? null : _selectFolder,
-                child: const Text('Odaberi'),
+            if (!hasFolder) ...[
+              ListTile(
+                title: const Text('SAF folder URI'),
+                subtitle: Text(_folderUri ?? 'Nije odabran folder'),
+                trailing: OutlinedButton(
+                  onPressed: _uploading ? null : _selectFolder,
+                  child: const Text('Odaberi'),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -565,20 +731,17 @@ class _UploadScreenState extends State<UploadScreen> {
                 message: 'Nema odabrane slike za upload.',
                 type: StatusType.info,
               ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _uploading ? null : _upload,
-                child: _uploading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Upload'),
+            if (_selectedImage != null) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: const ValueKey('upload-button'),
+                  onPressed: _uploading ? null : _upload,
+                  child: Text(_uploadButtonLabel()),
+                ),
               ),
-            ),
+            ],
             if (_message != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12),

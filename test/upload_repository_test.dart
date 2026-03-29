@@ -24,6 +24,7 @@ void main() {
   test('upload repository success', () async {
     final image = await tempImage();
     final client = ApiClient(tokenStorage: const TokenStorage());
+    final progressEvents = <List<int>>[];
 
     client.dio.interceptors.insert(
       0,
@@ -45,10 +46,14 @@ void main() {
       zivotniBroj: 'HR123',
       image: image,
       datum: '2026-03-09 10:00:00',
+      onSendProgress: (sent, total) {
+        progressEvents.add(<int>[sent, total]);
+      },
     );
 
     expect(result.status, 'OK');
     expect(result.slikaId, 100);
+    expect(progressEvents, isEmpty);
   });
 
   test('upload repository maps 400 validation', () async {

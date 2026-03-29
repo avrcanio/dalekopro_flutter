@@ -132,7 +132,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Upload slike goveda'), findsOneWidget);
-    expect(find.textContaining('HR123'), findsOneWidget);
+    expect(find.text('Odaberi govedo iz rezultata pretrage.'), findsOneWidget);
+    expect(find.text('HR123 - Mila'), findsNothing);
   });
 
   testWidgets('negative flow login invalid credentials shows 401 message', (

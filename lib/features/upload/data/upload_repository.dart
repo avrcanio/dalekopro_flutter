@@ -31,6 +31,7 @@ class UploadRepository {
     String? datum,
     double? latitude,
     double? longitude,
+    void Function(int sent, int total)? onSendProgress,
   }) async {
     final form = FormData.fromMap({
       'zivotni_broj': zivotniBroj,
@@ -48,6 +49,7 @@ class UploadRepository {
         '/api/slike_goveda/upload/',
         data: form,
         options: Options(extra: {'retryable': false}),
+        onSendProgress: onSendProgress,
       );
 
       final payload = response.data ?? <String, dynamic>{};

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/storage/saf_bridge.dart';
+import '../../../core/storage/token_storage.dart';
 import '../../../core/widgets/screen_insets.dart';
 import '../../cattle/data/cattle_repository.dart';
 import '../../cattle/presentation/cattle_list_screen.dart';
 import '../../cattle_transfer/data/cattle_transfer_repository.dart';
 import '../../cattle_transfer/presentation/cattle_transfer_screen.dart';
 import '../../farms/data/farms_repository.dart';
+import '../../settings/presentation/settings_screen.dart';
 import '../../upload/data/upload_repository.dart';
 import '../../upload/presentation/upload_screen.dart';
 
@@ -17,6 +20,8 @@ class DashboardScreen extends StatefulWidget {
     required this.cattleTransferRepository,
     required this.uploadRepository,
     required this.onLogout,
+    this.storage,
+    this.safBridge,
   });
 
   final FarmsRepository farmsRepository;
@@ -24,6 +29,8 @@ class DashboardScreen extends StatefulWidget {
   final CattleTransferRepository cattleTransferRepository;
   final UploadRepository uploadRepository;
   final Future<void> Function() onLogout;
+  final TokenStorage? storage;
+  final SafBridge? safBridge;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -85,12 +92,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _openSettingsScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(
+          storage: widget.storage,
+          safBridge: widget.safBridge,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pocetni dashboard'),
         actions: [
+          IconButton(
+            onPressed: _openSettingsScreen,
+            icon: const Icon(Icons.settings),
+          ),
           IconButton(
             onPressed: widget.onLogout,
             icon: const Icon(Icons.logout),

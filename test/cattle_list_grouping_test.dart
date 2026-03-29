@@ -63,6 +63,7 @@ void main() {
                 data: {
                   'animals': [
                     {
+                      'redni_broj': 1,
                       'govedo': {
                         'id': 1,
                         'zivotni_broj': 'HR0001',
@@ -74,6 +75,7 @@ void main() {
                       },
                     },
                     {
+                      'redni_broj': 2,
                       'govedo': {
                         'id': 2,
                         'zivotni_broj': 'HR0002',
@@ -251,6 +253,24 @@ void main() {
     await tester.tap(find.text('Bik (1)'));
     await tester.pumpAndSettle();
     expect(find.text('BikOne'), findsOneWidget);
+  });
+
+  testWidgets('shows redni broj above posjed without field label', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Kuća'), findsWidgets);
+    expect(find.textContaining('Rbr'), findsNothing);
+    expect(find.textContaining('Redni broj'), findsNothing);
+
+    final redniBroj = find.text('1');
+    final posjed = find.text('Kuća').first;
+    expect(
+      tester.getTopLeft(redniBroj).dy,
+      lessThan(tester.getTopLeft(posjed).dy),
+    );
   });
 
   testWidgets(

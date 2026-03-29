@@ -1,23 +1,28 @@
 package hr.dalekopro.farma
 
 import android.app.Activity
+import android.database.Cursor
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Point
 import android.net.Uri
+import android.os.Build
+import android.util.Size
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import android.provider.DocumentsContract.Document
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
 
 class MainActivity : FlutterActivity() {
     private val channelName = "dalekopro/saf"
     private val requestOpenTree = 4101
-    private val requestOpenImage = 4102
 
     private var pendingTreeResult: MethodChannel.Result? = null
-    private var pendingImageResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -47,27 +52,73 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "pickImageFromTree" -> {
-                        if (pendingImageResult != null) {
-                            result.error("BUSY", "Image selection already in progress.", null)
-                            return@setMethodCallHandler
-                        }
-
                         val treeUri = call.argument<String>("treeUri")
                         if (treeUri.isNullOrBlank()) {
                             result.error("INVALID_ARGUMENT", "treeUri is required.", null)
                             return@setMethodCallHandler
                         }
 
-                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "image/*"
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-                            putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(treeUri))
+                        result.success(mapOf("treeUri" to treeUri))
+                    }
+
+                    "listImagesFromTree" -> {
+                        val treeUri = call.argument<String>("treeUri")
+                        if (treeUri.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENT", "treeUri is required.", null)
+                            return@setMethodCallHandler
                         }
 
-                        pendingImageResult = result
-                        startActivityForResult(intent, requestOpenImage)
+                        try {
+                            result.success(listImagesFromTree(Uri.parse(treeUri)))
+                        } catch (error: Exception) {
+                            result.error("LIST_ERROR", error.message, null)
+                        }
+                    }
+
+                    "copyDocumentToCache" -> {
+                        val documentUri = call.argument<String>("documentUri")
+                        val suggestedFileName = call.argument<String>("suggestedFileName")
+                        if (documentUri.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENT", "documentUri is required.", null)
+                            return@setMethodCallHandler
+                        }
+
+                        try {
+                            val filePath = copyDocumentToCache(Uri.parse(documentUri), suggestedFileName)
+                            result.success(mapOf("filePath" to filePath))
+                        } catch (error: Exception) {
+                            result.error("READ_ERROR", error.message, null)
+                        }
+                    }
+
+                    "loadDocumentThumbnail" -> {
+                        val documentUri = call.argument<String>("documentUri")
+                        val width = call.argument<Int>("width") ?: 512
+                        val height = call.argument<Int>("height") ?: 512
+                        if (documentUri.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENT", "documentUri is required.", null)
+                            return@setMethodCallHandler
+                        }
+
+                        try {
+                            result.success(loadDocumentThumbnail(Uri.parse(documentUri), width, height))
+                        } catch (_: Exception) {
+                            result.success(null)
+                        }
+                    }
+
+                    "deleteDocument" -> {
+                        val documentUri = call.argument<String>("documentUri")
+                        if (documentUri.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENT", "documentUri is required.", null)
+                            return@setMethodCallHandler
+                        }
+
+                        try {
+                            result.success(deleteDocument(Uri.parse(documentUri)))
+                        } catch (error: Exception) {
+                            result.error("DELETE_ERROR", error.message, null)
+                        }
                     }
 
                     else -> result.notImplemented()
@@ -86,11 +137,6 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        if (requestCode == requestOpenImage) {
-            val result = pendingImageResult
-            pendingImageResult = null
-            handleImageSelection(result, resultCode, data)
-        }
     }
 
     private fun handleTreeSelection(result: MethodChannel.Result?, resultCode: Int, data: Intent?) {
@@ -108,39 +154,6 @@ class MainActivity : FlutterActivity() {
         result.success(mapOf("treeUri" to treeUri.toString()))
     }
 
-    private fun handleImageSelection(result: MethodChannel.Result?, resultCode: Int, data: Intent?) {
-        if (result == null) return
-        if (resultCode != Activity.RESULT_OK || data?.data == null) {
-            result.success(null)
-            return
-        }
-
-        val imageUri = data.data!!
-        val flags = data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
-        contentResolver.takePersistableUriPermission(imageUri, flags)
-
-        val fileName = resolveFileName(imageUri) ?: "picked_image_${System.currentTimeMillis()}.jpg"
-        val targetFile = File(cacheDir, fileName)
-
-        contentResolver.openInputStream(imageUri).use { input ->
-            if (input == null) {
-                result.error("READ_ERROR", "Could not read selected image.", null)
-                return
-            }
-
-            FileOutputStream(targetFile).use { output ->
-                input.copyTo(output)
-            }
-        }
-
-        result.success(
-            mapOf(
-                "imageUri" to imageUri.toString(),
-                "filePath" to targetFile.absolutePath,
-            )
-        )
-    }
-
     private fun resolveFileName(uri: Uri): String? {
         contentResolver.query(uri, null, null, null, null).use { cursor ->
             if (cursor == null || !cursor.moveToFirst()) return null
@@ -148,5 +161,119 @@ class MainActivity : FlutterActivity() {
             if (index < 0) return null
             return cursor.getString(index)
         }
+    }
+
+    private fun listImagesFromTree(treeUri: Uri): List<Map<String, Any?>> {
+        val treeDocumentUri = DocumentsContract.buildDocumentUriUsingTree(
+            treeUri,
+            DocumentsContract.getTreeDocumentId(treeUri)
+        )
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+            treeUri,
+            DocumentsContract.getDocumentId(treeDocumentUri)
+        )
+
+        val projection = arrayOf(
+            Document.COLUMN_DOCUMENT_ID,
+            Document.COLUMN_DISPLAY_NAME,
+            Document.COLUMN_MIME_TYPE,
+            Document.COLUMN_LAST_MODIFIED,
+            Document.COLUMN_SIZE,
+        )
+
+        val results = mutableListOf<Map<String, Any?>>()
+        contentResolver.query(childrenUri, projection, null, null, null).use { cursor ->
+            if (cursor == null) return emptyList()
+            while (cursor.moveToNext()) {
+                val mimeType = cursor.getStringOrNull(Document.COLUMN_MIME_TYPE) ?: continue
+                if (!mimeType.startsWith("image/")) {
+                    continue
+                }
+
+                val documentId = cursor.getStringOrNull(Document.COLUMN_DOCUMENT_ID) ?: continue
+                val documentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+
+                results.add(
+                    mapOf(
+                        "uri" to documentUri.toString(),
+                        "displayName" to (cursor.getStringOrNull(Document.COLUMN_DISPLAY_NAME) ?: ""),
+                        "mimeType" to mimeType,
+                        "lastModifiedMillis" to cursor.getLongOrNull(Document.COLUMN_LAST_MODIFIED),
+                        "sizeBytes" to cursor.getLongOrNull(Document.COLUMN_SIZE),
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    private fun copyDocumentToCache(documentUri: Uri, suggestedFileName: String?): String {
+        val safeFileName = sanitizeFileName(
+            suggestedFileName?.takeIf { it.isNotBlank() } ?: resolveFileName(documentUri)
+        ) ?: "picked_image_${System.currentTimeMillis()}.jpg"
+        val targetFile = File(cacheDir, safeFileName)
+
+        contentResolver.openInputStream(documentUri).use { input ->
+            requireNotNull(input) { "Could not read selected image." }
+            FileOutputStream(targetFile).use { output ->
+                input.copyTo(output)
+            }
+        }
+
+        return targetFile.absolutePath
+    }
+
+    private fun loadDocumentThumbnail(documentUri: Uri, width: Int, height: Int): ByteArray? {
+        val bitmap = try {
+            DocumentsContract.getDocumentThumbnail(
+                contentResolver,
+                documentUri,
+                Point(width, height),
+                null
+            )
+        } catch (_: Exception) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    contentResolver.loadThumbnail(documentUri, Size(width, height), null)
+                } catch (_: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+        } ?: return null
+
+        return bitmapToPng(bitmap)
+    }
+
+    private fun bitmapToPng(bitmap: Bitmap): ByteArray {
+        val output = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+        return output.toByteArray()
+    }
+
+    private fun deleteDocument(documentUri: Uri): Boolean {
+        return try {
+            DocumentsContract.deleteDocument(contentResolver, documentUri)
+        } catch (_: Exception) {
+            contentResolver.delete(documentUri, null, null) > 0
+        }
+    }
+
+    private fun Cursor.getStringOrNull(columnName: String): String? {
+        val index = getColumnIndex(columnName)
+        if (index < 0 || isNull(index)) return null
+        return getString(index)
+    }
+
+    private fun Cursor.getLongOrNull(columnName: String): Long? {
+        val index = getColumnIndex(columnName)
+        if (index < 0 || isNull(index)) return null
+        return getLong(index)
+    }
+
+    private fun sanitizeFileName(fileName: String?): String? {
+        if (fileName.isNullOrBlank()) return null
+        return fileName.replace(Regex("""[\\/:*?"<>|]"""), "_")
     }
 }

@@ -619,6 +619,49 @@ class _CattleListScreenState extends State<CattleListScreen> {
     return label.isEmpty ? 'Nepoznati posjed' : label;
   }
 
+  Widget? _buildTrailingMetadata(BuildContext context, Cattle item) {
+    final redniBroj = item.redniBroj.trim();
+    final posjed = item.posjed.trim();
+    if (redniBroj.isEmpty && posjed.isEmpty) {
+      return null;
+    }
+
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      width: 96,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (redniBroj.isNotEmpty)
+            Text(
+              redniBroj,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          if (posjed.isNotEmpty)
+            Text(
+              posjed,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   static bool _matchesSearch(Cattle item, String query) {
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
@@ -950,21 +993,7 @@ class _CattleListScreenState extends State<CattleListScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      trailing: item.posjed.trim().isEmpty
-                          ? null
-                          : SizedBox(
-                              width: 96,
-                              child: Text(
-                                item.posjed,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.right,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                            ),
+                      trailing: _buildTrailingMetadata(context, item),
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
