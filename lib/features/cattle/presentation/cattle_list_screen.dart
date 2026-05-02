@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/widgets/app_cached_network_image.dart';
+import 'cattle_photos_map_screen.dart';
 import 'cattle_thumbnail.dart';
 import '../../../core/widgets/screen_insets.dart';
 import '../../../core/widgets/status_widgets.dart';
@@ -280,6 +281,7 @@ class _CattleDetailScreenState extends State<CattleDetailScreen> {
       imageUrl: '',
       thumbnailUrl: '',
       imageUrls: const [],
+      galleryPhotos: const [],
       potomci: const [],
       hasPotomciField: false,
     );
@@ -292,7 +294,24 @@ class _CattleDetailScreenState extends State<CattleDetailScreen> {
     final uploadRepository = widget.uploadRepository;
 
     return Scaffold(
-      appBar: AppBar(title: Text(cattle.displayName)),
+      appBar: AppBar(
+        title: Text(cattle.displayName),
+        actions: [
+          if (cattle.hasGeoTaggedPhotos)
+            IconButton(
+              key: const Key('cattle-detail-map-button'),
+              icon: const Icon(Icons.map),
+              tooltip: 'Mapa slika',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => CattlePhotosMapScreen(cattle: cattle),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         bottom: true,

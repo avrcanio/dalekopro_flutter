@@ -56,7 +56,6 @@ class _UploadScreenState extends State<UploadScreen> {
   late final SafBridge _safBridge;
   late final ImagePicker _picker;
   final ImageCropper _cropper = ImageCropper();
-  final DateFormat _exifDateFormat = DateFormat('yyyy:MM:dd HH:mm:ss');
   final DateFormat _serverDateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
   late final TextEditingController _cattleSearchController;
   late final FocusNode _cattleSearchFocusNode;
@@ -304,6 +303,62 @@ class _UploadScreenState extends State<UploadScreen> {
     return tag.printable.toString().trim();
   }
 
+  /// Prvi ne-prazan datum snimanja / digitalizacije / izmjene (EXIF redoslijed).
+  static String _readCaptureDateRaw(Map<String, IfdTag> exif) {
+    const keys = <String>[
+      'EXIF DateTimeOriginal',
+      'EXIF DateTimeDigitized',
+      'Image DateTime',
+    ];
+    for (final k in keys) {
+      final v = _readTagPrintable(exif, k);
+      if (v.isNotEmpty) {
+        return v;
+      }
+    }
+    return '';
+  }
+
+  /// Pretvara EXIF tekst u `yyyy-MM-dd HH:mm:ss` za API (tolerira različite OEM formate).
+  String? _formatExifDateForServer(String raw) {
+    var s = raw.trim();
+    if (s.isEmpty) {
+      return null;
+    }
+    // Ukloni završni timezone ako postoji (npr. +02:00 ili Z).
+    s = s.replaceFirst(RegExp(r'\s*([Zz]|[\+\-]\d{2}:?\d{2}(?::\d{2})?)$'), '').trim();
+
+    final candidates = <DateFormat>[
+      DateFormat('yyyy:MM:dd HH:mm:ss'),
+      DateFormat('yyyy:MM:dd HH:mm:ss.SSS'),
+      DateFormat('yyyy-MM-dd HH:mm:ss'),
+      DateFormat('yyyy-MM-dd HH:mm:ss.SSS'),
+    ];
+    for (final fmt in candidates) {
+      try {
+        final d = fmt.parseStrict(s);
+        return _serverDateFormat.format(d);
+      } catch (_) {
+        try {
+          final d = fmt.parse(s);
+          return _serverDateFormat.format(d);
+        } catch (_) {}
+      }
+    }
+
+    final isoish = s.replaceFirstMapped(
+      RegExp(r'^(\d{4}):(\d{2}):(\d{2})'),
+      (m) => '${m[1]}-${m[2]}-${m[3]}',
+    );
+    try {
+      final normalized = isoish.contains('T') ? isoish : isoish.replaceFirst(' ', 'T');
+      final d = DateTime.parse(normalized);
+      return _serverDateFormat.format(d);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static double? _parseExifPart(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return null;
@@ -358,40 +413,35 @@ class _UploadScreenState extends State<UploadScreen> {
       return;
     }
     try {
-      var exif = await _readExif(uploadFile);
-      var dateRaw =
-          _readTagPrintable(exif, 'EXIF DateTimeOriginal').isNotEmpty
-          ? _readTagPrintable(exif, 'EXIF DateTimeOriginal')
-          : _readTagPrintable(exif, 'Image DateTime');
+      final uploadExif = await _readExif(uploadFile);
+      final sourceExif = sourceFile.path != uploadFile.path
+          ? await _readExif(sourceFile)
+          : uploadExif;
 
-      var latRaw = _readTagPrintable(exif, 'GPS GPSLatitude');
-      var latRef = _readTagPrintable(exif, 'GPS GPSLatitudeRef');
-      var lonRaw = _readTagPrintable(exif, 'GPS GPSLongitude');
-      var lonRef = _readTagPrintable(exif, 'GPS GPSLongitudeRef');
-
-      // If crop removed EXIF, fallback to the original file metadata.
-      if ((dateRaw.isEmpty || latRaw.isEmpty || lonRaw.isEmpty) &&
-          sourceFile.path != uploadFile.path) {
-        exif = await _readExif(sourceFile);
-        dateRaw =
-            _readTagPrintable(exif, 'EXIF DateTimeOriginal').isNotEmpty
-            ? _readTagPrintable(exif, 'EXIF DateTimeOriginal')
-            : _readTagPrintable(exif, 'Image DateTime');
-        latRaw = _readTagPrintable(exif, 'GPS GPSLatitude');
-        latRef = _readTagPrintable(exif, 'GPS GPSLatitudeRef');
-        lonRaw = _readTagPrintable(exif, 'GPS GPSLongitude');
-        lonRef = _readTagPrintable(exif, 'GPS GPSLongitudeRef');
+      // Datum snimanja: uvijek prvo iz izvorne datoteke (share/galerija prije cropa —
+      // image_cropper često ukloni DateTimeOriginal, pa bi inače backend mogao uzeti "sad").
+      String dateRaw = '';
+      if (sourceFile.path != uploadFile.path) {
+        dateRaw = _readCaptureDateRaw(sourceExif);
+      }
+      if (dateRaw.isEmpty) {
+        dateRaw = _readCaptureDateRaw(uploadExif);
       }
 
-      String? formattedDate;
-      if (dateRaw.isNotEmpty) {
-        try {
-          final parsed = _exifDateFormat.parseStrict(dateRaw);
-          formattedDate = _serverDateFormat.format(parsed);
-        } catch (_) {
-          formattedDate = null;
-        }
+      // GPS: prvo iz obrađene slike; ako nedostaje, iz izvornika.
+      var latRaw = _readTagPrintable(uploadExif, 'GPS GPSLatitude');
+      var latRef = _readTagPrintable(uploadExif, 'GPS GPSLatitudeRef');
+      var lonRaw = _readTagPrintable(uploadExif, 'GPS GPSLongitude');
+      var lonRef = _readTagPrintable(uploadExif, 'GPS GPSLongitudeRef');
+      if (latRaw.isEmpty || lonRaw.isEmpty) {
+        latRaw = _readTagPrintable(sourceExif, 'GPS GPSLatitude');
+        latRef = _readTagPrintable(sourceExif, 'GPS GPSLatitudeRef');
+        lonRaw = _readTagPrintable(sourceExif, 'GPS GPSLongitude');
+        lonRef = _readTagPrintable(sourceExif, 'GPS GPSLongitudeRef');
       }
+
+      final formattedDate =
+          dateRaw.isNotEmpty ? _formatExifDateForServer(dateRaw) : null;
 
       final latitude = latRaw.isEmpty
           ? null

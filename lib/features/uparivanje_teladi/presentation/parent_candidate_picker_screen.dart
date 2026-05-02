@@ -2,8 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../core/widgets/app_cached_network_image.dart';
+import '../../cattle/cattle_gallery_urls.dart';
 import '../../cattle/models/cattle.dart';
+import '../../cattle/presentation/cattle_gallery_fullscreen_dialog.dart';
 import '../../cattle/presentation/cattle_thumbnail.dart';
 import '../data/uparivanje_teladi_repository.dart';
 import '../models/parent_candidate.dart';
@@ -119,32 +120,6 @@ class _ParentCandidatePickerScreenState
     return cow.thumbnailUrl.isNotEmpty ? cow.thumbnailUrl : cow.imageUrl;
   }
 
-  /// Isti redoslijed kao u detalju goveda: galerija, zatim profil/thumbnail.
-  List<String> _galleryUrls(Cattle? cow) {
-    if (cow == null) {
-      return const <String>[];
-    }
-    final seen = <String>{};
-    final ordered = <String>[];
-    void add(String raw) {
-      final u = raw.trim();
-      if (u.isEmpty || seen.contains(u)) {
-        return;
-      }
-      seen.add(u);
-      ordered.add(u);
-    }
-
-    for (final u in cow.imageUrls) {
-      add(u);
-    }
-    if (ordered.isEmpty) {
-      add(cow.imageUrl);
-      add(cow.thumbnailUrl);
-    }
-    return ordered;
-  }
-
   void _onCardLongPress(BuildContext context, Cattle? cow) {
     if (!widget.pickMother) {
       return;
@@ -157,18 +132,17 @@ class _ParentCandidatePickerScreenState
       );
       return;
     }
-    final urls = _galleryUrls(cow);
+    final urls = cattleGalleryImageUrls(cow);
     if (urls.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nema dostupnih slika za pregled.')),
       );
       return;
     }
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black87,
-      useSafeArea: false,
-      builder: (ctx) => _CattleGalleryModal(urls: urls, subtitle: cow.zivotniBroj),
+    showCattleGalleryFullscreenDialog(
+      context,
+      urls: urls,
+      subtitle: cow.zivotniBroj,
     );
   }
 
@@ -255,140 +229,6 @@ class _ParentCandidatePickerScreenState
                     },
                   ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CattleGalleryModal extends StatefulWidget {
-  const _CattleGalleryModal({
-    required this.urls,
-    required this.subtitle,
-  });
-
-  final List<String> urls;
-  final String subtitle;
-
-  @override
-  State<_CattleGalleryModal> createState() => _CattleGalleryModalState();
-}
-
-class _CattleGalleryModalState extends State<_CattleGalleryModal> {
-  late final PageController _pageController;
-  int _index = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController();
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final n = widget.urls.length;
-
-    return Dialog.fullscreen(
-      backgroundColor: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          PageView.builder(
-            controller: _pageController,
-            itemCount: n,
-            onPageChanged: (i) => setState(() => _index = i),
-            itemBuilder: (context, i) {
-              final url = widget.urls[i];
-              return ColoredBox(
-                color: Colors.black,
-                child: Center(
-                  child: InteractiveViewer(
-                    minScale: 0.6,
-                    maxScale: 4,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return AppCachedNetworkImage(
-                          imageUrl: url,
-                          width: constraints.maxWidth,
-                          height: constraints.maxHeight,
-                          fit: BoxFit.contain,
-                          placeholder: const SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: CircularProgressIndicator(
-                              color: Colors.white54,
-                              strokeWidth: 2,
-                            ),
-                          ),
-                          errorBuilder: const Icon(
-                            Icons.broken_image_outlined,
-                            color: Colors.white38,
-                            size: 64,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 8, left: 8),
-                      child: Text(
-                        widget.subtitle.trim().isEmpty
-                            ? 'Pregled slika'
-                            : widget.subtitle,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                  Material(
-                    color: Colors.black45,
-                    shape: const CircleBorder(),
-                    clipBehavior: Clip.antiAlias,
-                    child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      tooltip: 'Zatvori',
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (n > 1)
-            Positioned(
-              bottom: 24,
-              left: 0,
-              right: 0,
-              child: Text(
-                '${_index + 1} / $n',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                ),
-              ),
-            ),
         ],
       ),
     );

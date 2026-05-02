@@ -10,6 +10,9 @@ class AppCachedNetworkImage extends StatelessWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
+    this.memCacheWidth,
+    this.memCacheHeight,
+    this.filterQuality,
     this.placeholder,
     this.errorBuilder,
   });
@@ -18,6 +21,10 @@ class AppCachedNetworkImage extends StatelessWidget {
   final double? width;
   final double? height;
   final BoxFit fit;
+  /// Ograničava dekodiranu širinu u memoriji (npr. širina × DPR za oštrinu bez punog megapiksela).
+  final int? memCacheWidth;
+  final int? memCacheHeight;
+  final FilterQuality? filterQuality;
   final Widget? placeholder;
   final Widget? errorBuilder;
 
@@ -33,6 +40,9 @@ class AppCachedNetworkImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
+      memCacheWidth: memCacheWidth,
+      memCacheHeight: memCacheHeight,
+      filterQuality: filterQuality ?? FilterQuality.low,
       placeholder: (_, __) => placeholder ?? const SizedBox.shrink(),
       errorWidget: (_, __, ___) => errorBuilder ?? const SizedBox.shrink(),
     );

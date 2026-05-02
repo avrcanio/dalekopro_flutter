@@ -11,6 +11,8 @@ import '../../cattle/presentation/cattle_list_screen.dart';
 import '../../cattle_transfer/data/cattle_transfer_repository.dart';
 import '../../cattle_transfer/presentation/cattle_transfer_screen.dart';
 import '../../farms/data/farms_repository.dart';
+import '../../nedostatak_markica/data/nedostatak_markica_repository.dart';
+import '../../nedostatak_markica/presentation/nedostatak_markica_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../upload/data/upload_repository.dart';
 import '../../upload/presentation/upload_screen.dart';
@@ -25,6 +27,7 @@ class DashboardScreen extends StatefulWidget {
     required this.cattleTransferRepository,
     required this.uploadRepository,
     required this.uparivanjeTeladiRepository,
+    required this.nedostatakMarkicaRepository,
     required this.onLogout,
     this.storage,
     this.safBridge,
@@ -35,6 +38,7 @@ class DashboardScreen extends StatefulWidget {
   final CattleTransferRepository cattleTransferRepository;
   final UploadRepository uploadRepository;
   final UparivanjeTeladiRepository uparivanjeTeladiRepository;
+  final NedostatakMarkicaRepository nedostatakMarkicaRepository;
   final Future<void> Function() onLogout;
   final TokenStorage? storage;
   final SafBridge? safBridge;
@@ -63,11 +67,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const String _uploadOption = 'Upload';
   static const String _transferOption = 'Premjestanje';
   static const String _pairingOption = 'Uparivanje teladi';
+  static const String _nedostatakOption = 'Nedostatak markica';
   static const List<String> _options = <String>[
     'Odaberi opciju',
     _uploadOption,
     _transferOption,
     _pairingOption,
+    _nedostatakOption,
   ];
 
   String _selectedOption = _options.first;
@@ -141,6 +147,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _openNedostatakMarkicaScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => NedostatakMarkicaScreen(
+          farmsRepository: widget.farmsRepository,
+          cattleRepository: widget.cattleRepository,
+          nedostatakRepository: widget.nedostatakMarkicaRepository,
+        ),
+      ),
+    );
+  }
+
   void _openSettingsScreen() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -156,7 +174,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pocetni dashboard'),
+        title: const Text('Početni dashboard'),
         actions: [
           IconButton(
             onPressed: _openSettingsScreen,
@@ -197,6 +215,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _openTransferScreen();
                 } else if (value == _pairingOption) {
                   _openUparivanjeTeladiScreen();
+                } else if (value == _nedostatakOption) {
+                  _openNedostatakMarkicaScreen();
                 }
               },
             ),
@@ -233,6 +253,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: _openUparivanjeTeladiScreen,
               icon: const Icon(Icons.child_care_outlined),
               label: const Text(_pairingOption),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _openNedostatakMarkicaScreen,
+              icon: const Icon(Icons.label_off_outlined),
+              label: const Text(_nedostatakOption),
             ),
           ],
         ),

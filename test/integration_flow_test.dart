@@ -10,6 +10,7 @@ import 'package:dalekopro_farma_flutter/features/cattle/data/cattle_repository.d
 import 'package:dalekopro_farma_flutter/features/cattle_transfer/data/cattle_transfer_repository.dart';
 import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
+import 'package:dalekopro_farma_flutter/features/nedostatak_markica/data/nedostatak_markica_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
 import 'package:dalekopro_farma_flutter/features/uparivanje_teladi/data/uparivanje_teladi_repository.dart';
 
@@ -113,6 +114,8 @@ void main() {
     final cattleTransferRepository = CattleTransferRepository(client: client);
     final uploadRepository = UploadRepository(client: client);
     final uparivanjeTeladiRepository = UparivanjeTeladiRepository(client: client);
+    final nedostatakMarkicaRepository =
+        NedostatakMarkicaRepository(client: client);
 
     await tester.pumpWidget(
       _FlowTestApp(
@@ -122,6 +125,7 @@ void main() {
         cattleTransferRepository: cattleTransferRepository,
         uploadRepository: uploadRepository,
         uparivanjeTeladiRepository: uparivanjeTeladiRepository,
+        nedostatakMarkicaRepository: nedostatakMarkicaRepository,
       ),
     );
 
@@ -192,6 +196,7 @@ class _FlowTestApp extends StatefulWidget {
     required this.cattleTransferRepository,
     required this.uploadRepository,
     required this.uparivanjeTeladiRepository,
+    required this.nedostatakMarkicaRepository,
   });
 
   final AuthRepository authRepository;
@@ -200,6 +205,7 @@ class _FlowTestApp extends StatefulWidget {
   final CattleTransferRepository cattleTransferRepository;
   final UploadRepository uploadRepository;
   final UparivanjeTeladiRepository uparivanjeTeladiRepository;
+  final NedostatakMarkicaRepository nedostatakMarkicaRepository;
 
   @override
   State<_FlowTestApp> createState() => _FlowTestAppState();
@@ -222,6 +228,7 @@ class _FlowTestAppState extends State<_FlowTestApp> {
               cattleTransferRepository: widget.cattleTransferRepository,
               uploadRepository: widget.uploadRepository,
               uparivanjeTeladiRepository: widget.uparivanjeTeladiRepository,
+              nedostatakMarkicaRepository: widget.nedostatakMarkicaRepository,
               onLogout: () async => setState(() => _token = null),
             ),
     );

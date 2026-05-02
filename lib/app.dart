@@ -8,6 +8,7 @@ import 'features/cattle/data/cattle_repository.dart';
 import 'features/cattle_transfer/data/cattle_transfer_repository.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/farms/data/farms_repository.dart';
+import 'features/nedostatak_markica/data/nedostatak_markica_repository.dart';
 import 'features/upload/data/upload_repository.dart';
 import 'features/uparivanje_teladi/data/uparivanje_teladi_repository.dart';
 
@@ -64,6 +65,8 @@ class _DalekoproAppState extends State<DalekoproApp> {
     final cattleTransferRepository = CattleTransferRepository(client: client);
     final uploadRepository = UploadRepository(client: client);
     final uparivanjeTeladiRepository = UparivanjeTeladiRepository(client: client);
+    final nedostatakMarkicaRepository =
+        NedostatakMarkicaRepository(client: client);
 
     return MaterialApp(
       title: 'Dalekopro Farma',
@@ -80,6 +83,7 @@ class _DalekoproAppState extends State<DalekoproApp> {
                     cattleTransferRepository: cattleTransferRepository,
                     uploadRepository: uploadRepository,
                     uparivanjeTeladiRepository: uparivanjeTeladiRepository,
+                    nedostatakMarkicaRepository: nedostatakMarkicaRepository,
                     onLogout: _logout,
                   )),
     );

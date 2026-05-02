@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../core/widgets/screen_insets.dart';
 import '../../cattle/data/cattle_repository.dart';
 import '../../cattle/models/cattle.dart';
+import '../../cattle/zivotni_broj_digits.dart';
+import '../../cattle/zivotni_broj_highlight_title.dart';
 import '../../cattle_transfer/data/cattle_transfer_repository.dart';
 import '../../cattle_transfer/models/holding.dart';
 import '../../farms/data/farms_repository.dart';
@@ -12,39 +14,6 @@ import '../../farms/models/farm.dart';
 import '../data/uparivanje_teladi_repository.dart';
 import '../models/uparivanje_telad.dart';
 import 'uparivanje_telad_form_screen.dart';
-
-bool _matchesZivotniBrojDigitsQuery(String zivotniBroj, String queryDigits) {
-  if (queryDigits.isEmpty) {
-    return true;
-  }
-  final idDigits = zivotniBroj.replaceAll(RegExp(r'\D'), '');
-  if (idDigits.isEmpty) {
-    return false;
-  }
-  final last4 = idDigits.length >= 4
-      ? idDigits.substring(idDigits.length - 4)
-      : idDigits;
-  if (queryDigits.length <= 4) {
-    return last4.startsWith(queryDigits);
-  }
-  return idDigits.endsWith(queryDigits);
-}
-
-/// Povrat indeksa prvog znaka u [zbroj] koji pripada bloku zadnjih [count] znamenki.
-int _startIndexOfLastDigits(String zbroj, int count) {
-  final digitIndices = <int>[];
-  for (var i = 0; i < zbroj.length; i++) {
-    final c = zbroj.codeUnitAt(i);
-    if (c >= 0x30 && c <= 0x39) {
-      digitIndices.add(i);
-    }
-  }
-  if (digitIndices.isEmpty) {
-    return zbroj.length;
-  }
-  final take = count < digitIndices.length ? count : digitIndices.length;
-  return digitIndices[digitIndices.length - take];
-}
 
 class UparivanjeTeladiScreen extends StatefulWidget {
   const UparivanjeTeladiScreen({
@@ -92,7 +61,7 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
       return _items;
     }
     return _items
-        .where((e) => _matchesZivotniBrojDigitsQuery(e.zivotniBroj, q))
+        .where((e) => matchesZivotniBrojDigitsQuery(e.zivotniBroj, q))
         .toList();
   }
 
@@ -417,7 +386,7 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
             leading: const CircleAvatar(
               child: Icon(Icons.child_care_outlined),
             ),
-            title: _zivotniBrojTitle(context, e.zivotniBroj),
+            title: ZivotniBrojHighlightTitle(zbroj: e.zivotniBroj),
             subtitle: Text(
               [
                 _posjedLabel(e),
@@ -433,31 +402,6 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _zivotniBrojTitle(BuildContext context, String zbroj) {
-    final theme = Theme.of(context);
-    final baseStyle = theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-        ) ??
-        const TextStyle(fontWeight: FontWeight.w600);
-    final start = _startIndexOfLastDigits(zbroj, 4);
-    if (start >= zbroj.length) {
-      return Text(zbroj, style: baseStyle);
-    }
-    final accent = baseStyle.copyWith(
-      color: Colors.red.shade700,
-      fontWeight: FontWeight.bold,
-    );
-    return Text.rich(
-      TextSpan(
-        style: baseStyle,
-        children: [
-          TextSpan(text: zbroj.substring(0, start)),
-          TextSpan(text: zbroj.substring(start), style: accent),
-        ],
-      ),
     );
   }
 }

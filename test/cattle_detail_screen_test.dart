@@ -38,6 +38,7 @@ void main() {
   Cattle buildCattle({
     required List<String> imageUrls,
     String imageUrl = '',
+    List<CattleGalleryPhoto> galleryPhotos = const [],
     List<CattleDescendant> potomci = const [],
   }) {
     return Cattle(
@@ -52,6 +53,7 @@ void main() {
       otac: 'JABLAN LB4',
       imageUrl: imageUrl,
       imageUrls: imageUrls,
+      galleryPhotos: galleryPhotos,
       potomci: potomci,
       hasPotomciField: true,
     );
@@ -266,6 +268,7 @@ void main() {
       ),
       imageUrl: cattle.imageUrl,
       imageUrls: cattle.imageUrls,
+      galleryPhotos: cattle.galleryPhotos,
       potomci: cattle.potomci,
       hasPotomciField: cattle.hasPotomciField,
     );
@@ -320,6 +323,7 @@ void main() {
       ),
       imageUrl: child.imageUrl,
       imageUrls: child.imageUrls,
+      galleryPhotos: child.galleryPhotos,
       potomci: child.potomci,
       hasPotomciField: child.hasPotomciField,
     );
@@ -419,6 +423,7 @@ void main() {
       ),
       imageUrl: child.imageUrl,
       imageUrls: child.imageUrls,
+      galleryPhotos: child.galleryPhotos,
       potomci: child.potomci,
       hasPotomciField: child.hasPotomciField,
     );
@@ -454,5 +459,66 @@ void main() {
     );
     expect(noticeFinder, findsOneWidget);
     expect(find.text('BELA B126', skipOffstage: false), findsWidgets);
+  });
+
+  testWidgets('map action hidden when no geo-tagged photos', (tester) async {
+    final cattle = buildCattle(
+      imageUrl: 'https://example.com/main.jpg',
+      imageUrls: const ['https://example.com/1.jpg'],
+      galleryPhotos: const [
+        CattleGalleryPhoto(
+          id: 1,
+          imageUrl: 'https://example.com/1.jpg',
+          latitude: 45.8,
+          longitude: 15.97,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CattleDetailScreen(
+          cattle: cattle,
+          allCattle: const [],
+          cattleRepository: buildCattleRepository(),
+          uploadRepository: buildUploadRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('cattle-detail-map-button')), findsNothing);
+  });
+
+  testWidgets('map action visible when at least one geo-tagged photo', (
+    tester,
+  ) async {
+    final cattle = buildCattle(
+      imageUrl: 'https://example.com/main.jpg',
+      imageUrls: const ['https://example.com/1.jpg'],
+      galleryPhotos: [
+        CattleGalleryPhoto(
+          id: 1,
+          imageUrl: 'https://example.com/1.jpg',
+          capturedAt: DateTime.utc(2026, 2, 7, 10, 30),
+          latitude: 45.815,
+          longitude: 15.9819,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CattleDetailScreen(
+          cattle: cattle,
+          allCattle: const [],
+          cattleRepository: buildCattleRepository(),
+          uploadRepository: buildUploadRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('cattle-detail-map-button')), findsOneWidget);
   });
 }

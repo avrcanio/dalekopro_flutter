@@ -5,7 +5,33 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.io.File
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+fun loadDotEnv(file: File): Map<String, String> {
+    if (!file.exists()) return emptyMap()
+    return file.readLines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") }
+        .mapNotNull { line ->
+            val idx = line.indexOf('=')
+            if (idx <= 0) return@mapNotNull null
+            val key = line.substring(0, idx).trim()
+            var value = line.substring(idx + 1).trim()
+            if ((value.startsWith("\"") && value.endsWith("\"")) ||
+                (value.startsWith("'") && value.endsWith("'"))
+            ) {
+                value = value.substring(1, value.length - 1)
+            }
+            key to value
+        }
+        .toMap()
+}
+
+// Root `.env` (jedan direktorij iznad `android/`) — vidi `.env.example`.
+val dotEnv: Map<String, String> = loadDotEnv(rootProject.file("../.env"))
+val googleMapsApiKey: String = dotEnv["GOOGLE_MAPS_API_KEY"] ?: ""
 
 val sharedKeyProperties = Properties()
 val sharedKeyPropertiesFile = rootProject.file("../../key.properties")
@@ -24,10 +50,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
     defaultConfig {
         applicationId = "hr.dalekopro.farma"
         // You can update the following values to match your application needs.
@@ -36,6 +58,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
     signingConfigs {
@@ -57,6 +80,12 @@ android {
                 signingConfigs.getByName("debug")
             }
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
     }
 }
 

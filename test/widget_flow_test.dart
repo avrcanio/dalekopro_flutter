@@ -17,6 +17,7 @@ import 'package:dalekopro_farma_flutter/features/cattle/presentation/cattle_list
 import 'package:dalekopro_farma_flutter/features/cattle_transfer/data/cattle_transfer_repository.dart';
 import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
+import 'package:dalekopro_farma_flutter/features/nedostatak_markica/data/nedostatak_markica_repository.dart';
 import 'package:dalekopro_farma_flutter/features/settings/presentation/settings_screen.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/presentation/upload_screen.dart';
@@ -957,6 +958,20 @@ void main() {
               return;
             }
 
+            if (options.path == '/api/markiranja/nedostatci/') {
+              handler.resolve(
+                Response<Map<String, dynamic>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: <String, dynamic>{
+                    'results': <dynamic>[],
+                    'next': null,
+                  },
+                ),
+              );
+              return;
+            }
+
             handler.reject(
               DioException(
                 requestOptions: options,
@@ -975,6 +990,8 @@ void main() {
             cattleTransferRepository: CattleTransferRepository(client: client),
             uploadRepository: UploadRepository(client: client),
             uparivanjeTeladiRepository: UparivanjeTeladiRepository(client: client),
+            nedostatakMarkicaRepository:
+                NedostatakMarkicaRepository(client: client),
             onLogout: () async {},
           ),
         ),
@@ -991,6 +1008,10 @@ void main() {
       expect(find.widgetWithText(FilledButton, 'Premjestanje'), findsOneWidget);
       expect(
         find.widgetWithText(FilledButton, 'Uparivanje teladi'),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(FilledButton, 'Nedostatak markica'),
         findsOneWidget,
       );
 

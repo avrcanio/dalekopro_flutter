@@ -69,6 +69,7 @@ class Cattle {
     required this.imageUrl,
     this.thumbnailUrl = '',
     this.imageUrls = const [],
+    this.galleryPhotos = const [],
     required this.potomci,
     this.hasPotomciField = false,
   });
@@ -92,10 +93,22 @@ class Cattle {
   final String imageUrl;
   final String thumbnailUrl;
   final List<String> imageUrls;
+  final List<CattleGalleryPhoto> galleryPhotos;
   final List<CattleDescendant> potomci;
   final bool hasPotomciField;
 
   String get displayName => ime.trim().isEmpty ? zivotniBroj : ime;
+
+  List<CattleGalleryPhoto> get geoTaggedPhotos => galleryPhotos
+      .where(
+        (p) =>
+            p.latitude != null &&
+            p.longitude != null &&
+            p.capturedAt != null,
+      )
+      .toList();
+
+  bool get hasGeoTaggedPhotos => geoTaggedPhotos.isNotEmpty;
 
   static String _extractText(dynamic value) {
     if (value == null) return '';
@@ -362,26 +375,26 @@ class Cattle {
     return '';
   }
 
-  static List<String> _extractImageUrls(
+  static List<CattleGalleryPhoto> _extractGalleryPhotos(
     Map<String, dynamic> govedo,
     Map<String, dynamic> apiEntry,
   ) {
-    final gallery = <String>[];
+    final ordered = <String, CattleGalleryPhoto>{};
 
     void appendFrom(dynamic value) {
       if (value is! List) return;
       for (final item in value) {
-        final parsed = _extractImageUrlFromValue(item);
-        if (parsed.isNotEmpty && !gallery.contains(parsed)) {
-          gallery.add(parsed);
-        }
+        final photo = CattleGalleryPhoto.fromApiItem(item);
+        if (photo == null) continue;
+        final key = photo.id > 0 ? 'id:${photo.id}' : 'url:${photo.imageUrl}';
+        ordered.putIfAbsent(key, () => photo);
       }
     }
 
     appendFrom(govedo['slike']);
     appendFrom(apiEntry['slike']);
 
-    return gallery;
+    return ordered.values.toList();
   }
 
   static String _extractThumbnailUrlFromGallery(
@@ -462,7 +475,8 @@ class Cattle {
       }
     }
 
-    final imageUrls = _extractImageUrls(govedo, apiEntry);
+    final galleryPhotos = _extractGalleryPhotos(govedo, apiEntry);
+    final imageUrls = galleryPhotos.map((e) => e.imageUrl).toList();
     final thumbnailUrl = _extractThumbnailUrl(govedo, apiEntry);
     final extractedImageUrl = _extractImageUrl(govedo, apiEntry);
     final primaryImageUrl = imageUrls.isNotEmpty
@@ -491,8 +505,86 @@ class Cattle {
       imageUrl: primaryImageUrl,
       thumbnailUrl: thumbnailUrl,
       imageUrls: imageUrls,
+      galleryPhotos: galleryPhotos,
       potomci: descendants,
       hasPotomciField: hasPotomciField,
+    );
+  }
+}
+
+class CattleGalleryPhoto {
+  const CattleGalleryPhoto({
+    required this.id,
+    required this.imageUrl,
+    this.thumbnailUrl = '',
+    this.capturedAt,
+    this.latitude,
+    this.longitude,
+  });
+
+  final int id;
+  final String imageUrl;
+  final String thumbnailUrl;
+  final DateTime? capturedAt;
+  final double? latitude;
+  final double? longitude;
+
+  String get markerKey => id > 0 ? 'id_$id' : 'url_${imageUrl.hashCode}';
+
+  static CattleGalleryPhoto? fromApiItem(dynamic item) {
+    final String imageUrl;
+    if (item is Map) {
+      final map = item.cast<String, dynamic>();
+      final rawOriginal = map['url']?.toString().trim() ?? '';
+      imageUrl = rawOriginal.isNotEmpty
+          ? Cattle._normalizeImageUrl(rawOriginal)
+          : Cattle._extractImageUrlFromValue(item);
+    } else {
+      imageUrl = Cattle._extractImageUrlFromValue(item);
+    }
+    if (imageUrl.isEmpty) return null;
+
+    if (item is! Map) {
+      return CattleGalleryPhoto(id: 0, imageUrl: imageUrl);
+    }
+
+    final map = item.cast<String, dynamic>();
+    final id = (map['id'] as num?)?.toInt() ?? 0;
+    final thumbCandidate = map['thumbnail_url'] ?? map['thumb_url'];
+    final thumbParsed = Cattle._extractImageUrlFromValue(thumbCandidate);
+    final thumbnailUrl = thumbParsed.isNotEmpty ? thumbParsed : '';
+
+    DateTime? capturedAt;
+    final datumRaw = map['datum'];
+    if (datumRaw != null) {
+      final s = datumRaw.toString().trim();
+      if (s.isNotEmpty) {
+        capturedAt = DateTime.tryParse(s);
+      }
+    }
+
+    double? lat;
+    double? lon;
+    final la = map['latitude'];
+    final lo = map['longitude'];
+    if (la != null && la.toString().trim().isNotEmpty) {
+      lat = double.tryParse(
+        la.toString().trim().replaceAll(',', '.'),
+      );
+    }
+    if (lo != null && lo.toString().trim().isNotEmpty) {
+      lon = double.tryParse(
+        lo.toString().trim().replaceAll(',', '.'),
+      );
+    }
+
+    return CattleGalleryPhoto(
+      id: id,
+      imageUrl: imageUrl,
+      thumbnailUrl: thumbnailUrl,
+      capturedAt: capturedAt,
+      latitude: lat,
+      longitude: lon,
     );
   }
 }
