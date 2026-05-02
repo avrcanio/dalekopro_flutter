@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../cattle/models/cattle.dart';
 import '../../cattle_transfer/models/holding.dart';
 import '../data/uparivanje_teladi_repository.dart';
 import '../models/parent_candidate.dart';
 import '../models/uparivanje_telad.dart';
 import 'parent_candidate_picker_screen.dart';
+import 'zivotni_broj_barcode_scan_screen.dart';
 
 class UparivanjeTeladFormScreen extends StatefulWidget {
   const UparivanjeTeladFormScreen({
@@ -14,6 +16,7 @@ class UparivanjeTeladFormScreen extends StatefulWidget {
     required this.farmLabel,
     required this.holdings,
     required this.repository,
+    required this.farmCattle,
     this.existing,
   });
 
@@ -21,6 +24,7 @@ class UparivanjeTeladFormScreen extends StatefulWidget {
   final String farmLabel;
   final List<Holding> holdings;
   final UparivanjeTeladiRepository repository;
+  final List<Cattle> farmCattle;
   final UparivanjeTelad? existing;
 
   @override
@@ -34,7 +38,8 @@ class _UparivanjeTeladFormScreenState extends State<UparivanjeTeladFormScreen> {
   static final _zbOk = RegExp(r'^HR \d{10}$');
 
   Holding? _posjed;
-  String _spol = 'Ž';
+  /// Prazan string dok korisnik ne odabere (samo novi unos).
+  String _spol = '';
   DateTime? _datum;
   int? _majkaId;
   int? _otacId;
@@ -50,7 +55,7 @@ class _UparivanjeTeladFormScreenState extends State<UparivanjeTeladFormScreen> {
     if (e != null) {
       _zbController.text = e.zivotniBroj;
       _spol = e.spol == 'M' ? 'M' : 'Ž';
-      _datum = e.datumTelenja ?? DateTime.now();
+      _datum = e.datumTelenja;
       _majkaId = e.majkaNaGospodarstvuId;
       _otacId = e.otacId;
       _majkaLabel = e.majkaDisplay;
@@ -62,7 +67,6 @@ class _UparivanjeTeladFormScreenState extends State<UparivanjeTeladFormScreen> {
         }
       }
     } else {
-      _datum = DateTime.now();
       if (widget.holdings.length == 1) {
         _posjed = widget.holdings.first;
       }
@@ -84,6 +88,40 @@ class _UparivanjeTeladFormScreenState extends State<UparivanjeTeladFormScreen> {
       }
     }
     return raw.trim();
+  }
+
+  /// Tekst s barkoda (često samo 10 znamenki ili GS1 s više znamenki).
+  static String zivotniBrojFromBarcodeRaw(String raw) {
+    final t = raw.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+    if (t.startsWith('HR')) {
+      return normalizeZivotniBroj(t);
+    }
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.length >= 10) {
+      final last10 = digits.substring(digits.length - 10);
+      if (RegExp(r'^\d{10}$').hasMatch(last10)) {
+        return 'HR $last10';
+      }
+    }
+    return normalizeZivotniBroj(t);
+  }
+
+  Future<void> _scanZivotniBroj() async {
+    final raw = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const ZivotniBrojBarcodeScanScreen(),
+      ),
+    );
+    if (raw == null || !mounted) {
+      return;
+    }
+    final formatted = zivotniBrojFromBarcodeRaw(raw);
+    setState(() {
+      _zbController.text = formatted;
+      _zbController.selection =
+          TextSelection.collapsed(offset: formatted.length);
+    });
   }
 
   Future<void> _pickDate() async {
@@ -115,6 +153,7 @@ class _UparivanjeTeladFormScreenState extends State<UparivanjeTeladFormScreen> {
           repository: widget.repository,
           pickMother: true,
           posjedVezaId: veza,
+          cattleForThumbnails: widget.farmCattle,
         ),
       ),
     );
@@ -248,7 +287,7 @@ class _UparivanjeTeladFormScreenState extends State<UparivanjeTeladFormScreen> {
   Widget build(BuildContext context) {
     final isEdit = widget.existing != null;
     final dateLabel = _datum == null
-        ? 'Odaberi datum'
+        ? 'Odaberi datum (obavezno)'
         : DateFormat.yMMMd('hr').format(_datum!);
 
     return Scaffold(
@@ -302,10 +341,15 @@ class _UparivanjeTeladFormScreenState extends State<UparivanjeTeladFormScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _zbController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Životni broj teladi',
                 hintText: 'HR 1234567890',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  tooltip: 'Skeniraj barkod',
+                  onPressed: _scanZivotniBroj,
+                ),
               ),
               validator: (v) {
                 final n = normalizeZivotniBroj(v ?? '');
@@ -317,16 +361,23 @@ class _UparivanjeTeladFormScreenState extends State<UparivanjeTeladFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              key: ValueKey<String>(_spol),
-              initialValue: _spol,
+              key: ValueKey<String>(_spol.isEmpty ? '__empty' : _spol),
+              initialValue: _spol.isEmpty ? null : _spol,
               decoration: const InputDecoration(
                 labelText: 'Spol',
+                hintText: 'Odaberi spol (obavezno)',
                 border: OutlineInputBorder(),
               ),
               items: const [
                 DropdownMenuItem(value: 'M', child: Text('Muško')),
                 DropdownMenuItem(value: 'Ž', child: Text('Žensko')),
               ],
+              validator: (v) {
+                if (v == null || v.isEmpty) {
+                  return 'Odaberite spol.';
+                }
+                return null;
+              },
               onChanged: (v) {
                 if (v != null) {
                   setState(() => _spol = v);

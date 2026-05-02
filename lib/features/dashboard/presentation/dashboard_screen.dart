@@ -133,6 +133,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       MaterialPageRoute(
         builder: (_) => UparivanjeTeladiScreen(
           farmsRepository: widget.farmsRepository,
+          cattleRepository: widget.cattleRepository,
           transferRepository: widget.cattleTransferRepository,
           uparivanjeRepository: widget.uparivanjeTeladiRepository,
         ),

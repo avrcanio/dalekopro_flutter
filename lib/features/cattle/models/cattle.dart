@@ -52,6 +52,7 @@ class CattleParentRef {
 class Cattle {
   const Cattle({
     required this.id,
+    this.govedoNaGospodarstvuId = 0,
     required this.zivotniBroj,
     this.redniBroj = '',
     required this.ime,
@@ -73,6 +74,8 @@ class Cattle {
   });
 
   final int id;
+  /// ID zapisa `GovedoNaGospodarstvu` iz liste `/animals/` (vanjski `id` stavke).
+  final int govedoNaGospodarstvuId;
   final String zivotniBroj;
   final String redniBroj;
   final String ime;
@@ -220,6 +223,16 @@ class Cattle {
       }
     }
 
+    return 0;
+  }
+
+  static int _extractGovedoNaGospodarstvuId(Map<String, dynamic> apiEntry) {
+    if (apiEntry.containsKey('govedo') && apiEntry['govedo'] is Map) {
+      final v = apiEntry['id'];
+      if (v is num) {
+        return v.toInt();
+      }
+    }
     return 0;
   }
 
@@ -458,6 +471,7 @@ class Cattle {
 
     return Cattle(
       id: (govedo['id'] as num?)?.toInt() ?? 0,
+      govedoNaGospodarstvuId: _extractGovedoNaGospodarstvuId(apiEntry),
       zivotniBroj: govedo['zivotni_broj']?.toString() ?? '',
       redniBroj:
           apiEntry['redni_broj']?.toString() ??

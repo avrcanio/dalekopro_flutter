@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/widgets/app_cached_network_image.dart';
+import 'cattle_thumbnail.dart';
 import '../../../core/widgets/screen_insets.dart';
 import '../../../core/widgets/status_widgets.dart';
 import '../../farms/data/farms_repository.dart';
@@ -978,7 +979,7 @@ class _CattleListScreenState extends State<CattleListScreen> {
                 children: [
                   ...cattleInGroup.map(
                     (item) => ListTile(
-                      leading: _CattleAvatar(
+                      leading: CattleThumbnail(
                         imageUrl: item.thumbnailUrl.isNotEmpty
                             ? item.thumbnailUrl
                             : item.imageUrl,
@@ -1154,54 +1155,3 @@ class _ImageFallback extends StatelessWidget {
   }
 }
 
-class _CattleAvatar extends StatelessWidget {
-  const _CattleAvatar({required this.imageUrl});
-
-  final String imageUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    const width = 48.0;
-    const height = 64.0;
-
-    if (imageUrl.trim().isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: AppCachedNetworkImage(
-          imageUrl: imageUrl,
-          width: width,
-          height: height,
-          fit: BoxFit.cover,
-          placeholder: Container(
-            width: width,
-            height: height,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          ),
-          errorBuilder: const _AvatarFallback(),
-        ),
-      );
-    }
-
-    return const _AvatarFallback();
-  }
-}
-
-class _AvatarFallback extends StatelessWidget {
-  const _AvatarFallback();
-
-  @override
-  Widget build(BuildContext context) {
-    const width = 48.0;
-    const height = 64.0;
-
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Icon(Icons.pets_outlined),
-    );
-  }
-}

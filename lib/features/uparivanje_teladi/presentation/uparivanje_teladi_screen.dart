@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/widgets/screen_insets.dart';
+import '../../cattle/data/cattle_repository.dart';
+import '../../cattle/models/cattle.dart';
 import '../../cattle_transfer/data/cattle_transfer_repository.dart';
 import '../../cattle_transfer/models/holding.dart';
 import '../../farms/data/farms_repository.dart';
@@ -10,15 +13,50 @@ import '../data/uparivanje_teladi_repository.dart';
 import '../models/uparivanje_telad.dart';
 import 'uparivanje_telad_form_screen.dart';
 
+bool _matchesZivotniBrojDigitsQuery(String zivotniBroj, String queryDigits) {
+  if (queryDigits.isEmpty) {
+    return true;
+  }
+  final idDigits = zivotniBroj.replaceAll(RegExp(r'\D'), '');
+  if (idDigits.isEmpty) {
+    return false;
+  }
+  final last4 = idDigits.length >= 4
+      ? idDigits.substring(idDigits.length - 4)
+      : idDigits;
+  if (queryDigits.length <= 4) {
+    return last4.startsWith(queryDigits);
+  }
+  return idDigits.endsWith(queryDigits);
+}
+
+/// Povrat indeksa prvog znaka u [zbroj] koji pripada bloku zadnjih [count] znamenki.
+int _startIndexOfLastDigits(String zbroj, int count) {
+  final digitIndices = <int>[];
+  for (var i = 0; i < zbroj.length; i++) {
+    final c = zbroj.codeUnitAt(i);
+    if (c >= 0x30 && c <= 0x39) {
+      digitIndices.add(i);
+    }
+  }
+  if (digitIndices.isEmpty) {
+    return zbroj.length;
+  }
+  final take = count < digitIndices.length ? count : digitIndices.length;
+  return digitIndices[digitIndices.length - take];
+}
+
 class UparivanjeTeladiScreen extends StatefulWidget {
   const UparivanjeTeladiScreen({
     super.key,
     required this.farmsRepository,
+    required this.cattleRepository,
     required this.transferRepository,
     required this.uparivanjeRepository,
   });
 
   final FarmsRepository farmsRepository;
+  final CattleRepository cattleRepository;
   final CattleTransferRepository transferRepository;
   final UparivanjeTeladiRepository uparivanjeRepository;
 
@@ -32,12 +70,30 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
   List<Farm> _farms = const [];
   Farm? _activeFarm;
   List<Holding> _holdings = const [];
+  List<Cattle> _farmCattle = const [];
   List<UparivanjeTelad> _items = const [];
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadInitial();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<UparivanjeTelad> get _filteredItems {
+    final q = _searchController.text.replaceAll(RegExp(r'\D'), '');
+    if (q.isEmpty) {
+      return _items;
+    }
+    return _items
+        .where((e) => _matchesZivotniBrojDigitsQuery(e.zivotniBroj, q))
+        .toList();
   }
 
   Future<void> _loadInitial() async {
@@ -51,6 +107,9 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
       final holdings = farm == null
           ? const <Holding>[]
           : await widget.transferRepository.fetchHoldings(farm.id);
+      final cattle = farm == null
+          ? const <Cattle>[]
+          : await widget.cattleRepository.fetchCattleByFarm(farm.id);
       final items = farm == null
           ? const <UparivanjeTelad>[]
           : await widget.uparivanjeRepository.fetchList(farm.id);
@@ -59,6 +118,7 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
         _farms = farms;
         _activeFarm = farm;
         _holdings = holdings;
+        _farmCattle = cattle;
         _items = items;
       });
     } catch (_) {
@@ -82,10 +142,12 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
     });
     try {
       final holdings = await widget.transferRepository.fetchHoldings(farm.id);
+      final cattle = await widget.cattleRepository.fetchCattleByFarm(farm.id);
       final items = await widget.uparivanjeRepository.fetchList(farm.id);
       if (!mounted) return;
       setState(() {
         _holdings = holdings;
+        _farmCattle = cattle;
         _items = items;
       });
     } catch (_) {
@@ -107,8 +169,12 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
     }
     try {
       final items = await widget.uparivanjeRepository.fetchList(farm.id);
+      final cattle = await widget.cattleRepository.fetchCattleByFarm(farm.id);
       if (!mounted) return;
-      setState(() => _items = items);
+      setState(() {
+        _items = items;
+        _farmCattle = cattle;
+      });
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -163,6 +229,7 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
           farmLabel: farm.label,
           holdings: _holdings,
           repository: widget.uparivanjeRepository,
+          farmCattle: _farmCattle,
           existing: existing,
         ),
       ),
@@ -260,6 +327,31 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
+        if (_activeFarm != null && _holdings.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Pretraži po zadnjim znamenkama životnog broja',
+                prefixIcon: const Icon(Icons.search),
+                border: const OutlineInputBorder(),
+                isDense: true,
+                suffixIcon: _searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {});
+                        },
+                      ),
+              ),
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _refresh,
@@ -299,21 +391,33 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
       );
     }
 
+    final visible = _filteredItems;
+    if (visible.isEmpty && _items.isNotEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: screenBodyPadding(context),
+        children: const [
+          SizedBox(height: 48),
+          Text(
+            'Nema rezultata za unesene znamenke.',
+            textAlign: TextAlign.center,
+          ),
+        ],
+      );
+    }
+
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: screenBodyPadding(context, top: 8),
-      itemCount: _items.length,
+      itemCount: visible.length,
       itemBuilder: (context, index) {
-        final e = _items[index];
+        final e = visible[index];
         return Card(
           child: ListTile(
             leading: const CircleAvatar(
               child: Icon(Icons.child_care_outlined),
             ),
-            title: Text(
-              e.zivotniBroj,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+            title: _zivotniBrojTitle(context, e.zivotniBroj),
             subtitle: Text(
               [
                 _posjedLabel(e),
@@ -329,6 +433,31 @@ class _UparivanjeTeladiScreenState extends State<UparivanjeTeladiScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _zivotniBrojTitle(BuildContext context, String zbroj) {
+    final theme = Theme.of(context);
+    final baseStyle = theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+        ) ??
+        const TextStyle(fontWeight: FontWeight.w600);
+    final start = _startIndexOfLastDigits(zbroj, 4);
+    if (start >= zbroj.length) {
+      return Text(zbroj, style: baseStyle);
+    }
+    final accent = baseStyle.copyWith(
+      color: Colors.red.shade700,
+      fontWeight: FontWeight.bold,
+    );
+    return Text.rich(
+      TextSpan(
+        style: baseStyle,
+        children: [
+          TextSpan(text: zbroj.substring(0, start)),
+          TextSpan(text: zbroj.substring(start), style: accent),
+        ],
+      ),
     );
   }
 }
