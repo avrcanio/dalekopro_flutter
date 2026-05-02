@@ -1,8 +1,10 @@
 package hr.dalekopro.farma
 
 import android.app.Activity
+import android.content.Context
 import android.database.Cursor
 import android.content.Intent
+import android.os.Bundle
 import android.graphics.Bitmap
 import android.graphics.Point
 import android.net.Uri
@@ -20,12 +22,37 @@ import java.io.FileOutputStream
 
 class MainActivity : FlutterActivity() {
     private val channelName = "dalekopro/saf"
+    private val shareChannelName = "dalekopro/share"
     private val requestOpenTree = 4101
 
     private var pendingTreeResult: MethodChannel.Result? = null
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleSendIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSendIntent(intent)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, shareChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "consumePendingSharePath" -> {
+                        val prefs = getSharedPreferences(SHARE_PREFS_NAME, Context.MODE_PRIVATE)
+                        val path = prefs.getString(PENDING_IMAGE_PATH_KEY, null)
+                        prefs.edit().remove(PENDING_IMAGE_PATH_KEY).apply()
+                        result.success(path)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
@@ -124,6 +151,46 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun handleSendIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) {
+            return
+        }
+
+        val declaredType = intent.type
+        if (declaredType != null && !declaredType.startsWith("image/")) {
+            return
+        }
+
+        val streamUri = getSendStreamUri(intent) ?: return
+
+        if (declaredType == null) {
+            val resolvedType = contentResolver.getType(streamUri)
+            if (resolvedType != null && !resolvedType.startsWith("image/")) {
+                return
+            }
+        }
+
+        try {
+            val path = copyDocumentToCache(streamUri, resolveFileName(streamUri))
+            getSharedPreferences(SHARE_PREFS_NAME, Context.MODE_PRIVATE).edit()
+                .putString(PENDING_IMAGE_PATH_KEY, path)
+                .apply()
+        } catch (_: Exception) {
+            // Gallery URI may be unreadable; Flutter will not receive a pending path.
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getSendStreamUri(intent: Intent): Uri? {
+        val fromExtra = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM)
+        }
+        return fromExtra
+            ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
     }
 
     @Deprecated("Deprecated in Java")
@@ -275,5 +342,10 @@ class MainActivity : FlutterActivity() {
     private fun sanitizeFileName(fileName: String?): String? {
         if (fileName.isNullOrBlank()) return null
         return fileName.replace(Regex("""[\\/:*?"<>|]"""), "_")
+    }
+
+    companion object {
+        private const val SHARE_PREFS_NAME = "dalekopro_share"
+        private const val PENDING_IMAGE_PATH_KEY = "pending_image_path"
     }
 }

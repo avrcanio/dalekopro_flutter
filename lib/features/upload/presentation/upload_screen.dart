@@ -29,6 +29,8 @@ class UploadScreen extends StatefulWidget {
     this.initialSelectedImageSourceDocumentUri,
     this.initialSelectedImageSourceName,
     this.initialSelectedCattleForTest,
+    this.initialSharedCachePath,
+    this.skipExifForTest,
   });
 
   final List<Cattle> cattle;
@@ -41,6 +43,9 @@ class UploadScreen extends StatefulWidget {
   final String? initialSelectedImageSourceDocumentUri;
   final String? initialSelectedImageSourceName;
   final Cattle? initialSelectedCattleForTest;
+  final String? initialSharedCachePath;
+  /// When true, skips async EXIF reads (widget tests only; real devices use EXIF).
+  final bool? skipExifForTest;
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
@@ -87,6 +92,38 @@ class _UploadScreenState extends State<UploadScreen> {
       _cattleSearchController.text = _cattleOptionLabel(_selectedCattle!);
     }
     _loadFolderUri();
+    final sharedPath = widget.initialSharedCachePath;
+    if (sharedPath != null && sharedPath.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_openInitialSharedImage(sharedPath));
+      });
+    }
+  }
+
+  Future<void> _openInitialSharedImage(String path) async {
+    try {
+      _clearSelectedImageSource();
+      final file = File(path);
+      if (!file.existsSync()) {
+        if (!mounted) return;
+        _setMessage(
+          'Podijeljena slika vise nije dostupna. Podijeli ponovo.',
+          StatusType.error,
+        );
+        return;
+      }
+      final cropped = await _cropAndSet(file);
+      if (!mounted) return;
+      if (!cropped) {
+        _setMessage('Obrada podijeljene slike je otkazana.', StatusType.info);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _setMessage(
+        'Nije moguce obraditi podijeljenu sliku. Podijeli ponovo.',
+        StatusType.error,
+      );
+    }
   }
 
   @override
@@ -311,6 +348,15 @@ class _UploadScreenState extends State<UploadScreen> {
     required File sourceFile,
     required File uploadFile,
   }) async {
+    if (widget.skipExifForTest == true) {
+      if (!mounted) return;
+      setState(() {
+        _exifDate = null;
+        _exifLatitude = null;
+        _exifLongitude = null;
+      });
+      return;
+    }
     try {
       var exif = await _readExif(uploadFile);
       var dateRaw =
@@ -402,10 +448,10 @@ class _UploadScreenState extends State<UploadScreen> {
       if (croppedFile == null) {
         return false;
       }
-      if (!mounted) return false;
       final uploadFile = croppedFile;
       await _extractExifFromImage(sourceFile: file, uploadFile: uploadFile);
 
+      if (!mounted) return false;
       setState(() {
         _selectedImage = uploadFile;
       });

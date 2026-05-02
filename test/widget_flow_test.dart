@@ -92,6 +92,80 @@ void main() {
     );
   });
 
+  testWidgets('password field toggles obscure text', (tester) async {
+    final storage = const TokenStorage();
+    final client = ApiClient(tokenStorage: storage);
+    final repo = AuthRepository(client: client, tokenStorage: storage);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LoginScreen(repository: repo, onLogin: (_) {}),
+      ),
+    );
+
+    final passwordFieldFinder = find.byType(TextFormField).last;
+    final passwordTextField = find.descendant(
+      of: passwordFieldFinder,
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(passwordTextField).obscureText, isTrue);
+
+    await tester.tap(find.byTooltip('Prikaži lozinku'));
+    await tester.pump();
+
+    expect(tester.widget<TextField>(passwordTextField).obscureText, isFalse);
+
+    await tester.tap(find.byTooltip('Sakrij lozinku'));
+    await tester.pump();
+
+    expect(tester.widget<TextField>(passwordTextField).obscureText, isTrue);
+  });
+
+  testWidgets('upload screen applies initialSharedCachePath through crop override', (
+    tester,
+  ) async {
+    final storage = const TokenStorage();
+    final client = ApiClient(tokenStorage: storage);
+    final path = '${Directory.systemTemp.path}/share_intent_upload_test.png';
+    File(path).writeAsBytesSync(_tinyPngBytes);
+    final cattle = [
+      Cattle(
+        id: 1,
+        zivotniBroj: 'HR123',
+        ime: 'Mila',
+        spol: 'Z',
+        datumTelenja: '2020-05-01',
+        uzrast: '',
+        majka: '',
+        otac: '',
+        imageUrl: '',
+        potomci: const [],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UploadScreen(
+          cattle: cattle,
+          repository: UploadRepository(client: client),
+          storage: storage,
+          initialSharedCachePath: path,
+          initialSelectedCattleForTest: cattle.first,
+          cropImageOverride: (f) => Future<File?>.value(f),
+          skipExifForTest: true,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('upload-button')), findsOneWidget);
+  });
+
   testWidgets('cattle list shows empty state', (tester) async {
     final storage = const TokenStorage();
     final client = ApiClient(tokenStorage: storage);

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../core/platform/share_intent_bridge.dart';
 import '../../../core/storage/saf_bridge.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../../core/widgets/screen_insets.dart';
@@ -37,6 +40,22 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_tryConsumeSharedImage());
+    });
+  }
+
+  Future<void> _tryConsumeSharedImage() async {
+    if (!mounted) return;
+    final path = await ShareIntentBridge.consumePendingSharePath();
+    if (!mounted) return;
+    if (path == null || path.isEmpty) return;
+    await _openUploadScreen(initialSharedCachePath: path);
+  }
+
   static const String _uploadOption = 'Upload';
   static const String _transferOption = 'Premjestanje';
   static const List<String> _options = <String>[
@@ -47,14 +66,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String _selectedOption = _options.first;
 
-  Future<void> _openUploadScreen() async {
+  Future<void> _openUploadScreen({String? initialSharedCachePath}) async {
     try {
       final farms = await widget.farmsRepository.fetchFarms();
       if (!mounted) return;
       if (farms.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Nema dostupnih gospodarstava za upload.'),
+          SnackBar(
+            content: Text(
+              initialSharedCachePath != null
+                  ? 'Nema dostupnih gospodarstava. Podijeli sliku ponovo nakon prijave.'
+                  : 'Nema dostupnih gospodarstava za upload.',
+            ),
           ),
         );
         return;
@@ -66,15 +89,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) =>
-              UploadScreen(cattle: cattle, repository: widget.uploadRepository),
+          builder: (_) => UploadScreen(
+            cattle: cattle,
+            repository: widget.uploadRepository,
+            initialSharedCachePath: initialSharedCachePath,
+          ),
         ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Neuspjelo ucitavanje podataka za upload.'),
+        SnackBar(
+          content: Text(
+            initialSharedCachePath != null
+                ? 'Neuspjelo ucitavanje podataka. Podijeli sliku ponovo.'
+                : 'Neuspjelo ucitavanje podataka za upload.',
+          ),
         ),
       );
     }

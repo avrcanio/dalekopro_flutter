@@ -23,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _submitting = false;
+  bool _obscurePassword = true;
   String? _error;
 
   @override
@@ -88,8 +89,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Lozinka'),
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Lozinka',
+                      suffixIcon: IconButton(
+                        tooltip: _obscurePassword
+                            ? 'Prikaži lozinku'
+                            : 'Sakrij lozinku',
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                      ),
+                    ),
                     validator: (value) => (value == null || value.isEmpty)
                         ? 'Unesi lozinku'
                         : null,
