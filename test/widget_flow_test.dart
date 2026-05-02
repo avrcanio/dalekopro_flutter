@@ -20,6 +20,7 @@ import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dar
 import 'package:dalekopro_farma_flutter/features/settings/presentation/settings_screen.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/presentation/upload_screen.dart';
+import 'package:dalekopro_farma_flutter/features/uparivanje_teladi/data/uparivanje_teladi_repository.dart';
 
 import 'test_helpers.dart';
 
@@ -928,6 +929,34 @@ void main() {
               return;
             }
 
+            if (options.path == '/api/gospodarstva/1/posjedi/') {
+              handler.resolve(
+                Response<List<Map<String, dynamic>>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: [
+                    {
+                      'id': 10,
+                      'parcela_posjed_display': 'Test posjed',
+                    },
+                  ],
+                ),
+              );
+              return;
+            }
+
+            if (options.path ==
+                '/api/markiranja/gospodarstva/1/uparivanja-teladi/') {
+              handler.resolve(
+                Response<List<dynamic>>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: const <dynamic>[],
+                ),
+              );
+              return;
+            }
+
             handler.reject(
               DioException(
                 requestOptions: options,
@@ -945,6 +974,7 @@ void main() {
             cattleRepository: CattleRepository(client: client),
             cattleTransferRepository: CattleTransferRepository(client: client),
             uploadRepository: UploadRepository(client: client),
+            uparivanjeTeladiRepository: UparivanjeTeladiRepository(client: client),
             onLogout: () async {},
           ),
         ),
@@ -959,6 +989,10 @@ void main() {
       expect(find.text('Goveda'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Upload'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Premjestanje'), findsOneWidget);
+      expect(
+        find.widgetWithText(FilledButton, 'Uparivanje teladi'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byIcon(Icons.settings));
       await tester.pumpAndSettle();
@@ -994,6 +1028,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Premještanje goveda'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Uparivanje teladi'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Nema zapisa uparivanja'), findsOneWidget);
     },
   );
 

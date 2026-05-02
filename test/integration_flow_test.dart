@@ -11,6 +11,7 @@ import 'package:dalekopro_farma_flutter/features/cattle_transfer/data/cattle_tra
 import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
+import 'package:dalekopro_farma_flutter/features/uparivanje_teladi/data/uparivanje_teladi_repository.dart';
 
 import 'test_helpers.dart';
 
@@ -111,6 +112,7 @@ void main() {
     final cattleRepository = CattleRepository(client: client);
     final cattleTransferRepository = CattleTransferRepository(client: client);
     final uploadRepository = UploadRepository(client: client);
+    final uparivanjeTeladiRepository = UparivanjeTeladiRepository(client: client);
 
     await tester.pumpWidget(
       _FlowTestApp(
@@ -119,6 +121,7 @@ void main() {
         cattleRepository: cattleRepository,
         cattleTransferRepository: cattleTransferRepository,
         uploadRepository: uploadRepository,
+        uparivanjeTeladiRepository: uparivanjeTeladiRepository,
       ),
     );
 
@@ -188,6 +191,7 @@ class _FlowTestApp extends StatefulWidget {
     required this.cattleRepository,
     required this.cattleTransferRepository,
     required this.uploadRepository,
+    required this.uparivanjeTeladiRepository,
   });
 
   final AuthRepository authRepository;
@@ -195,6 +199,7 @@ class _FlowTestApp extends StatefulWidget {
   final CattleRepository cattleRepository;
   final CattleTransferRepository cattleTransferRepository;
   final UploadRepository uploadRepository;
+  final UparivanjeTeladiRepository uparivanjeTeladiRepository;
 
   @override
   State<_FlowTestApp> createState() => _FlowTestAppState();
@@ -216,6 +221,7 @@ class _FlowTestAppState extends State<_FlowTestApp> {
               cattleRepository: widget.cattleRepository,
               cattleTransferRepository: widget.cattleTransferRepository,
               uploadRepository: widget.uploadRepository,
+              uparivanjeTeladiRepository: widget.uparivanjeTeladiRepository,
               onLogout: () async => setState(() => _token = null),
             ),
     );

@@ -9,6 +9,7 @@ import 'features/cattle_transfer/data/cattle_transfer_repository.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/farms/data/farms_repository.dart';
 import 'features/upload/data/upload_repository.dart';
+import 'features/uparivanje_teladi/data/uparivanje_teladi_repository.dart';
 
 class DalekoproApp extends StatefulWidget {
   const DalekoproApp({super.key});
@@ -62,6 +63,7 @@ class _DalekoproAppState extends State<DalekoproApp> {
     final cattleRepository = CattleRepository(client: client);
     final cattleTransferRepository = CattleTransferRepository(client: client);
     final uploadRepository = UploadRepository(client: client);
+    final uparivanjeTeladiRepository = UparivanjeTeladiRepository(client: client);
 
     return MaterialApp(
       title: 'Dalekopro Farma',
@@ -77,6 +79,7 @@ class _DalekoproAppState extends State<DalekoproApp> {
                     cattleRepository: cattleRepository,
                     cattleTransferRepository: cattleTransferRepository,
                     uploadRepository: uploadRepository,
+                    uparivanjeTeladiRepository: uparivanjeTeladiRepository,
                     onLogout: _logout,
                   )),
     );

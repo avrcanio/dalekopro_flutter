@@ -14,6 +14,8 @@ import '../../farms/data/farms_repository.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../upload/data/upload_repository.dart';
 import '../../upload/presentation/upload_screen.dart';
+import '../../uparivanje_teladi/data/uparivanje_teladi_repository.dart';
+import '../../uparivanje_teladi/presentation/uparivanje_teladi_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -22,6 +24,7 @@ class DashboardScreen extends StatefulWidget {
     required this.cattleRepository,
     required this.cattleTransferRepository,
     required this.uploadRepository,
+    required this.uparivanjeTeladiRepository,
     required this.onLogout,
     this.storage,
     this.safBridge,
@@ -31,6 +34,7 @@ class DashboardScreen extends StatefulWidget {
   final CattleRepository cattleRepository;
   final CattleTransferRepository cattleTransferRepository;
   final UploadRepository uploadRepository;
+  final UparivanjeTeladiRepository uparivanjeTeladiRepository;
   final Future<void> Function() onLogout;
   final TokenStorage? storage;
   final SafBridge? safBridge;
@@ -58,10 +62,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   static const String _uploadOption = 'Upload';
   static const String _transferOption = 'Premjestanje';
+  static const String _pairingOption = 'Uparivanje teladi';
   static const List<String> _options = <String>[
     'Odaberi opciju',
     _uploadOption,
     _transferOption,
+    _pairingOption,
   ];
 
   String _selectedOption = _options.first;
@@ -122,6 +128,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _openUparivanjeTeladiScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => UparivanjeTeladiScreen(
+          farmsRepository: widget.farmsRepository,
+          transferRepository: widget.cattleTransferRepository,
+          uparivanjeRepository: widget.uparivanjeTeladiRepository,
+        ),
+      ),
+    );
+  }
+
   void _openSettingsScreen() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -176,6 +194,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _openUploadScreen();
                 } else if (value == _transferOption) {
                   _openTransferScreen();
+                } else if (value == _pairingOption) {
+                  _openUparivanjeTeladiScreen();
                 }
               },
             ),
@@ -206,6 +226,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: _openTransferScreen,
               icon: const Icon(Icons.swap_horiz),
               label: const Text(_transferOption),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _openUparivanjeTeladiScreen,
+              icon: const Icon(Icons.child_care_outlined),
+              label: const Text(_pairingOption),
             ),
           ],
         ),
