@@ -1,3 +1,6 @@
+# Cursor / VS Code (lokalni multi-root workspace)
+Dalekopro_full.code-workspace
+
 # Miscellaneous
 *.class
 *.log
