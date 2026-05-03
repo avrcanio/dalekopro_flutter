@@ -33,7 +33,7 @@ void main() {
     await tester.pumpWidget(const DalekoproApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Pocetni dashboard'), findsOneWidget);
+    expect(find.text('Početni dashboard'), findsOneWidget);
     expect(find.text('Goveda'), findsOneWidget);
   });
 }

@@ -17,6 +17,8 @@ import '../../settings/presentation/settings_screen.dart';
 import '../../upload/data/upload_repository.dart';
 import '../../upload/presentation/upload_screen.dart';
 import '../../uparivanje_teladi/data/uparivanje_teladi_repository.dart';
+import '../../odlasci/data/odlasci_repository.dart';
+import '../../odlasci/presentation/odlasci_screen.dart';
 import '../../uparivanje_teladi/presentation/uparivanje_teladi_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -28,6 +30,7 @@ class DashboardScreen extends StatefulWidget {
     required this.uploadRepository,
     required this.uparivanjeTeladiRepository,
     required this.nedostatakMarkicaRepository,
+    required this.odlasciRepository,
     required this.onLogout,
     this.storage,
     this.safBridge,
@@ -39,6 +42,7 @@ class DashboardScreen extends StatefulWidget {
   final UploadRepository uploadRepository;
   final UparivanjeTeladiRepository uparivanjeTeladiRepository;
   final NedostatakMarkicaRepository nedostatakMarkicaRepository;
+  final OdlasciRepository odlasciRepository;
   final Future<void> Function() onLogout;
   final TokenStorage? storage;
   final SafBridge? safBridge;
@@ -68,12 +72,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const String _transferOption = 'Premjestanje';
   static const String _pairingOption = 'Uparivanje teladi';
   static const String _nedostatakOption = 'Nedostatak markica';
+  static const String _odlasciOption = 'Odlasci';
   static const List<String> _options = <String>[
     'Odaberi opciju',
     _uploadOption,
     _transferOption,
     _pairingOption,
     _nedostatakOption,
+    _odlasciOption,
   ];
 
   String _selectedOption = _options.first;
@@ -159,6 +165,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _openOdlasciScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OdlasciScreen(
+          farmsRepository: widget.farmsRepository,
+          cattleRepository: widget.cattleRepository,
+          odlasciRepository: widget.odlasciRepository,
+        ),
+      ),
+    );
+  }
+
   void _openSettingsScreen() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -217,6 +235,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _openUparivanjeTeladiScreen();
                 } else if (value == _nedostatakOption) {
                   _openNedostatakMarkicaScreen();
+                } else if (value == _odlasciOption) {
+                  _openOdlasciScreen();
                 }
               },
             ),
@@ -259,6 +279,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: _openNedostatakMarkicaScreen,
               icon: const Icon(Icons.label_off_outlined),
               label: const Text(_nedostatakOption),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _openOdlasciScreen,
+              icon: const Icon(Icons.exit_to_app_outlined),
+              label: const Text(_odlasciOption),
             ),
           ],
         ),

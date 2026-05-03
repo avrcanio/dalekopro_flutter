@@ -18,6 +18,7 @@ import 'package:dalekopro_farma_flutter/features/cattle_transfer/data/cattle_tra
 import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
 import 'package:dalekopro_farma_flutter/features/nedostatak_markica/data/nedostatak_markica_repository.dart';
+import 'package:dalekopro_farma_flutter/features/odlasci/data/odlasci_repository.dart';
 import 'package:dalekopro_farma_flutter/features/settings/presentation/settings_screen.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/presentation/upload_screen.dart';
@@ -972,6 +973,37 @@ void main() {
               return;
             }
 
+            final odlPath = options.path;
+            if (odlPath.contains('/api/odlasci/gospodarstvo/')) {
+              if (odlPath.endsWith('/lookup/')) {
+                handler.resolve(
+                  Response<Map<String, dynamic>>(
+                    requestOptions: options,
+                    statusCode: 200,
+                    data: <String, dynamic>{
+                      'druga_gospodarstva': <dynamic>[],
+                      'klaonice': <dynamic>[],
+                      'kafilerije': <dynamic>[],
+                      'veterinari': <dynamic>[],
+                      'vozila': <dynamic>[],
+                    },
+                  ),
+                );
+                return;
+              }
+              if (odlPath.endsWith('/odlasci/') &&
+                  options.method.toUpperCase() == 'GET') {
+                handler.resolve(
+                  Response<List<dynamic>>(
+                    requestOptions: options,
+                    statusCode: 200,
+                    data: const <dynamic>[],
+                  ),
+                );
+                return;
+              }
+            }
+
             handler.reject(
               DioException(
                 requestOptions: options,
@@ -992,12 +1024,13 @@ void main() {
             uparivanjeTeladiRepository: UparivanjeTeladiRepository(client: client),
             nedostatakMarkicaRepository:
                 NedostatakMarkicaRepository(client: client),
+            odlasciRepository: OdlasciRepository(client: client),
             onLogout: () async {},
           ),
         ),
       );
 
-      expect(find.text('Pocetni dashboard'), findsOneWidget);
+      expect(find.text('Početni dashboard'), findsOneWidget);
       expect(find.byIcon(Icons.settings), findsOneWidget);
       expect(
         find.widgetWithText(DropdownButtonFormField<String>, 'Odaberi opciju'),
@@ -1014,6 +1047,7 @@ void main() {
         find.widgetWithText(FilledButton, 'Nedostatak markica'),
         findsOneWidget,
       );
+      expect(find.widgetWithText(FilledButton, 'Odlasci'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.settings));
       await tester.pumpAndSettle();

@@ -11,6 +11,7 @@ import 'package:dalekopro_farma_flutter/features/cattle_transfer/data/cattle_tra
 import 'package:dalekopro_farma_flutter/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dalekopro_farma_flutter/features/farms/data/farms_repository.dart';
 import 'package:dalekopro_farma_flutter/features/nedostatak_markica/data/nedostatak_markica_repository.dart';
+import 'package:dalekopro_farma_flutter/features/odlasci/data/odlasci_repository.dart';
 import 'package:dalekopro_farma_flutter/features/upload/data/upload_repository.dart';
 import 'package:dalekopro_farma_flutter/features/uparivanje_teladi/data/uparivanje_teladi_repository.dart';
 
@@ -116,6 +117,7 @@ void main() {
     final uparivanjeTeladiRepository = UparivanjeTeladiRepository(client: client);
     final nedostatakMarkicaRepository =
         NedostatakMarkicaRepository(client: client);
+    final odlasciRepository = OdlasciRepository(client: client);
 
     await tester.pumpWidget(
       _FlowTestApp(
@@ -126,6 +128,7 @@ void main() {
         uploadRepository: uploadRepository,
         uparivanjeTeladiRepository: uparivanjeTeladiRepository,
         nedostatakMarkicaRepository: nedostatakMarkicaRepository,
+        odlasciRepository: odlasciRepository,
       ),
     );
 
@@ -134,7 +137,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Prijavi se'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Pocetni dashboard'), findsOneWidget);
+    expect(find.text('Početni dashboard'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Upload'));
     await tester.pumpAndSettle();
 
@@ -197,6 +200,7 @@ class _FlowTestApp extends StatefulWidget {
     required this.uploadRepository,
     required this.uparivanjeTeladiRepository,
     required this.nedostatakMarkicaRepository,
+    required this.odlasciRepository,
   });
 
   final AuthRepository authRepository;
@@ -206,6 +210,7 @@ class _FlowTestApp extends StatefulWidget {
   final UploadRepository uploadRepository;
   final UparivanjeTeladiRepository uparivanjeTeladiRepository;
   final NedostatakMarkicaRepository nedostatakMarkicaRepository;
+  final OdlasciRepository odlasciRepository;
 
   @override
   State<_FlowTestApp> createState() => _FlowTestAppState();
@@ -229,6 +234,7 @@ class _FlowTestAppState extends State<_FlowTestApp> {
               uploadRepository: widget.uploadRepository,
               uparivanjeTeladiRepository: widget.uparivanjeTeladiRepository,
               nedostatakMarkicaRepository: widget.nedostatakMarkicaRepository,
+              odlasciRepository: widget.odlasciRepository,
               onLogout: () async => setState(() => _token = null),
             ),
     );
